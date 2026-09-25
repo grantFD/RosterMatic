@@ -46,7 +46,9 @@
         .btn-sm { padding: 4px 8px; font-size: 0.8rem; }
         
         .file-status-container { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .fallback-badge { background: #f59e0b; color: #ffffff; font-size: 0.75rem; font-weight: 700; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; display: none; }
+        .sync-badge { background: var(--success); color: #ffffff; font-size: 0.75rem; font-weight: 700; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .sync-badge.error { background: var(--danger); }
+        .sync-badge.offline { background: var(--warning); }
 
         .roster-container { display: flex; flex-direction: column; gap: 20px; }
         .week-card { background: var(--surface); padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 2px solid transparent; }
@@ -72,7 +74,6 @@
         .status-dot.green { background-color: var(--success); }
 
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
-        #confirmDeleteModal { z-index: 1100; } #dataErrorModal { z-index: 1200; } #unavailableListModal { z-index: 1150; } #initFileModal, #permissionModal { z-index: 1300; }
         .modal { background: var(--surface); padding: 25px; border-radius: 8px; width: 90%; max-width: 650px; max-height: 90vh; overflow-y: auto; }
         .modal-close { float: right; cursor: pointer; font-size: 1.5rem; font-weight: bold; line-height: 1; }
 
@@ -133,40 +134,25 @@
         <button class="warning" onclick="ExportManager.openShareModal()">Share</button>
 
         <div class="file-status-container">
-            <span id="fallbackBadge" class="fallback-badge">Fallback</span>
+            <span id="syncBadge" class="sync-badge offline">Connecting...</span>
             <span id="lastSavedDisplay" style="font-size: 0.9rem; color: #4b5563;">Updated: Never</span>
         </div>
     </div>
 
     <div class="app-title-container">
-        <h1>RosterMatic</h1>
+        <h1>RosterMatic <span style="font-size: 1rem; color: #6b7280; font-weight: normal;">Live Sync Mode</span></h1>
         <span id="statusBanner" class="status-banner"></span>
     </div>
 
     <div class="roster-container" id="rosterContainer"></div>
-
     <div class="panel-overlay" id="panelOverlay" onclick="UI.closeAllPanels()"></div>
 
-    <!-- Initialization Modal for Initial Setup -->
-    <div class="modal-overlay" id="initFileModal">
-        <div class="modal">
-            <h2>Welcome to RosterMatic</h2>
-            <p style="color: #4b5563; margin-bottom: 20px;">No existing data file was found. Would you like to create a new one with a minimal set of sample data, or open an existing RosterMasterData.json file?</p>
-            <div style="display:flex; gap: 10px;">
-                <button class="success" onclick="FileFS.createNewFile()">Create New Data File</button>
-                <button style="background: #2563eb;" onclick="FileFS.openExistingFile()">Open Existing File</button>
-            </div>
-            <input type="file" id="fallbackFileInput" style="display: none;" accept=".json" onchange="FileFS.handleFallbackOpen(event)">
-        </div>
-    </div>
-
-    <div class="modal-overlay" id="permissionModal">
-        <div class="modal">
-            <h2>Restore File Access</h2>
-            <p style="color: #4b5563; margin-bottom: 20px;">Please grant permission to read and auto-save to your existing RosterMasterData.json file to continue working.</p>
-            <div style="display:flex; justify-content: flex-end; gap: 10px;">
-                <button style="background: #6b7280;" onclick="FileFS.cancelPermissionRequest()">Choose Another File</button>
-                <button id="grantAccessBtn" class="success" onclick="FileFS.grantPermission()">Grant Access</button>
+    <div class="modal-overlay" id="customDialogModal" style="z-index: 2000;">
+        <div class="modal" style="max-width: 400px; text-align: center;">
+            <h2 id="customDialogTitle">Message</h2>
+            <p id="customDialogMessage" style="margin-bottom: 20px; color: #4b5563; font-size: 1.05rem;"></p>
+            <div style="display:flex; justify-content: center; gap: 10px;" id="customDialogButtons">
+                <!-- buttons injected here via JS -->
             </div>
         </div>
     </div>
@@ -390,8 +376,20 @@
             <h3>Data & Roster Maintenance</h3>
             <div class="utility-option">
                 <div class="btn-col"><button class="success" onclick="Utilities.recalcRosters()">Recalculate Rosters</button></div>
-                <div class="desc-col">Backs up current rosters and forces a complete recalculation and re-population while preserving manual changes.</div>
+                <div class="desc-col">Forces a complete recalculation and re-population while preserving manual changes for connected peers.</div>
             </div>
+
+            <h3>Backup & Restore</h3>
+            <div class="utility-option">
+                <div class="btn-col"><button class="success" onclick="Utilities.exportData()">Export Data (JSON)</button></div>
+                <div class="desc-col">Download a complete backup of all teams, people, events, and rosters.</div>
+            </div>
+            <div class="utility-option">
+                <div class="btn-col"><button class="warning" onclick="Utilities.triggerImport()">Import Data (JSON)</button></div>
+                <div class="desc-col">Restore a previously exported backup file. <strong>Warning: This replaces all current data!</strong></div>
+            </div>
+            <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="Utilities.handleImport(event)">
+
             <div style="display:flex; justify-content: flex-end; margin-top: 15px;">
                 <button type="button" onclick="UI.closeModal('utilitiesModal')" style="background:#6b7280;">Close</button>
             </div>
@@ -436,38 +434,18 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="confirmDeleteModal">
-        <div class="modal">
-            <span class="modal-close" onclick="UI.closeModal('confirmDeleteModal')">&times;</span>
-            <h2>Confirm Person Deletion</h2>
-            <p>Are you sure you want to remove <strong id="deletePersonName"></strong>?</p>
-            <div class="management-section">
-                <h4>Impacted Items:</h4>
-                <ul>
-                    <li><strong>Team Memberships:</strong> Will be removed from <span id="deletePersonTeamsCount">0</span> teams.</li>
-                    <li><strong>Rostered Events:</strong> Will be unassigned from <span id="deletePersonRostersCount">0</span> rostered events.</li>
-                </ul>
-            </div>
-            <div style="display:flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" onclick="UI.closeModal('confirmDeleteModal')" style="background:#6b7280;">Cancel</button>
-                <button type="button" class="danger" id="confirmDeleteBtn">Permanently Delete</button>
-            </div>
-        </div>
-    </div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    <div class="modal-overlay" id="dataErrorModal">
-        <div class="modal">
-            <span class="modal-close" onclick="UI.closeModal('dataErrorModal')">&times;</span>
-            <h2 style="color: var(--danger);">Data Validation / File Error</h2>
-            <p id="dataErrorSubtitle">The system encountered errors while validating or reading roster data.</p>
-            <div class="error-log" id="dataErrorLog"></div>
-            <div style="display:flex; justify-content: flex-end; margin-top: 15px;">
-                <button type="button" onclick="UI.closeModal('dataErrorModal')">Dismiss</button>
-            </div>
-        </div>
-    </div>
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'roster-matic-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
 
-    <script>
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
         const DEMO_DATA = {
             teams: [
                 { id: 101, name: "Morning Support" },
@@ -485,234 +463,6 @@
             closures: [],
             rosters: {},
             lastSaved: ""
-        };
-
-        const IDB = {
-            dbName: 'RosterMaticFS_DB',
-            storeName: 'handles',
-            async getDB() {
-                return new Promise((resolve, reject) => {
-                    const req = indexedDB.open(this.dbName, 1);
-                    req.onupgradeneeded = e => e.target.result.createObjectStore(this.storeName);
-                    req.onsuccess = e => resolve(e.target.result);
-                    req.onerror = e => reject(e.target.error);
-                });
-            },
-            async set(key, val) {
-                const db = await this.getDB();
-                return new Promise((resolve, reject) => {
-                    const tx = db.transaction(this.storeName, 'readwrite');
-                    tx.objectStore(this.storeName).put(val, key);
-                    tx.oncomplete = () => resolve();
-                    tx.onerror = e => reject(e.target.error);
-                });
-            },
-            async get(key) {
-                const db = await this.getDB();
-                return new Promise((resolve, reject) => {
-                    const tx = db.transaction(this.storeName, 'readonly');
-                    const req = tx.objectStore(this.storeName).get(key);
-                    req.onsuccess = () => resolve(req.result);
-                    req.onerror = e => reject(e.target.error);
-                });
-            }
-        };
-
-        const FileFS = {
-            fileHandle: null,
-            isFallback: !('showOpenFilePicker' in window),
-            tempHandleForPermission: null,
-            isRequestingPermission: false,
-
-            async init() {
-                if (this.isFallback) {
-                    const badge = document.getElementById('fallbackBadge');
-                    if (badge) {
-                        badge.style.display = 'inline-block';
-                        setTimeout(() => { badge.style.display = 'none'; }, 8000);
-                    }
-                    const fallbackData = await IDB.get('fallbackDataStr');
-                    if (fallbackData) {
-                        Storage.processLoadedJSON(fallbackData);
-                    } else {
-                        UI.openModal('initFileModal');
-                    }
-                } else {
-                    try {
-                        const handle = await IDB.get('appFileHandle');
-                        if (handle) {
-                            const opts = { mode: 'readwrite' };
-                            // Passive query only - does NOT trigger native browser alert dialog
-                            const status = await handle.queryPermission(opts);
-                            if (status === 'granted') {
-                                this.fileHandle = handle;
-                                await this.loadFromFileHandle();
-                            } else {
-                                this.tempHandleForPermission = handle;
-                                UI.openModal('permissionModal');
-                            }
-                        } else {
-                            UI.openModal('initFileModal');
-                        }
-                    } catch (e) {
-                        console.warn('Could not restore file handle:', e);
-                        UI.openModal('initFileModal');
-                    }
-                }
-                this.updateDisplay();
-            },
-
-            async loadFromFileHandle() {
-                try {
-                    const file = await this.fileHandle.getFile();
-                    const text = await file.text();
-                    Storage.processLoadedJSON(text);
-                } catch(e) {
-                    console.error('Error reading from saved file link:', e);
-                    UI.openModal('initFileModal');
-                }
-            },
-
-            async grantPermission() {
-                if (this.isRequestingPermission || !this.tempHandleForPermission) return;
-                
-                this.isRequestingPermission = true;
-                const grantBtn = document.getElementById('grantAccessBtn');
-                if (grantBtn) grantBtn.disabled = true;
-
-                try {
-                    const opts = { mode: 'readwrite' };
-                    // Explicit user gesture stack allows calling requestPermission cleanly
-                    const status = await this.tempHandleForPermission.requestPermission(opts);
-                    
-                    if (status === 'granted') {
-                        this.fileHandle = this.tempHandleForPermission;
-                        this.tempHandleForPermission = null;
-                        UI.closeModal('permissionModal');
-                        await this.loadFromFileHandle();
-                        this.updateDisplay();
-                    } else {
-                        UI.closeModal('permissionModal');
-                        UI.openModal('initFileModal');
-                        UI.setStatusMessage('Permission was not granted. Please select or create a data file.');
-                    }
-                } catch (e) {
-                    console.error("Permission request failed.", e);
-                    UI.closeModal('permissionModal');
-                    UI.openModal('initFileModal');
-                } finally {
-                    this.isRequestingPermission = false;
-                    if (grantBtn) grantBtn.disabled = false;
-                }
-            },
-
-            cancelPermissionRequest() {
-                this.tempHandleForPermission = null;
-                UI.closeModal('permissionModal');
-                UI.openModal('initFileModal');
-            },
-
-            async createNewFile() {
-                Store.data = JSON.parse(JSON.stringify(DEMO_DATA));
-                Store.rebuildCaches();
-                CoreLogic.recalculateRosters();
-                Store.data.lastSaved = new Date().toISOString();
-
-                if (this.isFallback) {
-                    await IDB.set('fallbackDataStr', JSON.stringify(Store.data, null, 2));
-                    UI.closeModal('initFileModal');
-                    UI.renderRoster();
-                    this.updateDisplay();
-                    UI.setStatusMessage('New file created in local storage.');
-                } else {
-                    try {
-                        const handle = await window.showSaveFilePicker({
-                            suggestedName: 'RosterMasterData.json',
-                            types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }]
-                        });
-                        this.fileHandle = handle;
-                        await IDB.set('appFileHandle', handle);
-                        await this.saveDataToFile(handle);
-                        UI.closeModal('initFileModal');
-                        UI.renderRoster();
-                        this.updateDisplay();
-                        UI.setStatusMessage('New file created successfully.');
-                    } catch (err) {
-                        if (err.name !== 'AbortError') alert('Failed to create file: ' + err.message);
-                    }
-                }
-            },
-
-            async openExistingFile() {
-                if (this.isFallback) {
-                    document.getElementById('fallbackFileInput').click();
-                    return;
-                }
-                try {
-                    const [handle] = await window.showOpenFilePicker({
-                        types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
-                        multiple: false
-                    });
-                    this.fileHandle = handle;
-                    await IDB.set('appFileHandle', handle);
-                    await this.loadFromFileHandle();
-                    UI.closeModal('initFileModal');
-                    this.updateDisplay();
-                } catch (err) {
-                    if (err.name !== 'AbortError') alert('Failed to open file: ' + err.message);
-                }
-            },
-
-            async handleFallbackOpen(event) {
-                const file = event.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = async e => {
-                    const text = e.target.result;
-                    if (Storage.processLoadedJSON(text)) {
-                        await IDB.set('fallbackDataStr', text);
-                        UI.closeModal('initFileModal');
-                        this.updateDisplay();
-                    }
-                    event.target.value = '';
-                };
-                reader.readAsText(file);
-            },
-
-            async saveFile() {
-                if (Store.simulatedDate !== null) return; // Disable saving in simulated time
-                
-                Store.data.lastSaved = new Date().toISOString();
-                const dataStr = JSON.stringify(Store.data, null, 2);
-
-                if (this.isFallback) {
-                    await IDB.set('fallbackDataStr', dataStr);
-                    this.updateDisplay();
-                    return;
-                }
-                
-                if (this.fileHandle) {
-                    try {
-                        await this.saveDataToFile(this.fileHandle, dataStr);
-                        this.updateDisplay();
-                    } catch (err) {
-                        console.error('Error auto-saving file:', err);
-                    }
-                }
-            },
-
-            async saveDataToFile(handle, dataStr = null) {
-                const writable = await handle.createWritable();
-                await writable.write(dataStr || JSON.stringify(Store.data, null, 2));
-                await writable.close();
-            },
-
-            updateDisplay() {
-                const lastSavedEl = document.getElementById('lastSavedDisplay');
-                if (lastSavedEl) {
-                    lastSavedEl.innerText = `Updated: ${Utils.formatShortDateTime(Store.data.lastSaved)}`;
-                }
-            }
         };
 
         const Store = {
@@ -736,14 +486,80 @@
                 this.cache.closuresMap = new Map(this.data.closures.map(c => [c.id, c]));
             },
 
-            createRosterBackup() {
-                if (!this.data.rosters) return;
-                const backupKey = `rosters_backup_${Date.now()}`;
-                this.data[backupKey] = JSON.parse(JSON.stringify(this.data.rosters));
+            autoSave() {
+                CloudSync.save();
+            }
+        };
+
+        const CloudSync = {
+            docRef: null,
+            init() {
+                // Following strict path rules for collaborative public data
+                this.docRef = doc(db, 'artifacts', appId, 'public', 'data', 'rosterState', 'main');
+                
+                onSnapshot(this.docRef, (snapshot) => {
+                    const badge = document.getElementById('syncBadge');
+                    if (snapshot.exists()) {
+                        const incomingData = snapshot.data().rosterData;
+                        const validated = Storage.validateAndRepair(incomingData);
+                        
+                        Store.data = validated.valid ? validated.data : validated.repairedData;
+                        Store.rebuildCaches();
+                        UI.renderRoster();
+                        UI.refreshCurrentPanel();
+                        
+                        badge.className = 'sync-badge';
+                        badge.innerText = 'Connected';
+                        document.getElementById('lastSavedDisplay').innerText = `Live Updated: ${Utils.formatShortDateTime(Store.data.lastSaved)}`;
+                    } else {
+                        // Document doesn't exist, seed with demo data
+                        Store.data = JSON.parse(JSON.stringify(DEMO_DATA));
+                        Store.rebuildCaches();
+                        CoreLogic.recalculateRosters();
+                        this.save(true);
+                    }
+                }, (error) => {
+                    console.error("Firestore Sync error:", error);
+                    const badge = document.getElementById('syncBadge');
+                    badge.className = 'sync-badge error';
+                    badge.innerText = 'Sync Error';
+                });
             },
 
-            autoSave() {
-                FileFS.saveFile();
+            async save(force = false) {
+                if (Store.simulatedDate !== null && !force) return; // Prevent overwriting real time with simulated modifications unless forced
+                if (!this.docRef) return;
+                
+                Store.data.lastSaved = new Date().toISOString();
+                try {
+                    await setDoc(this.docRef, { rosterData: Store.data }, { merge: true });
+                } catch (e) {
+                    console.error("Failed to push updates", e);
+                }
+            }
+        };
+
+        const Dialog = {
+            alert(msg, title = "Notice") {
+                document.getElementById('customDialogTitle').innerText = title;
+                document.getElementById('customDialogMessage').innerText = msg;
+                const btnContainer = document.getElementById('customDialogButtons');
+                btnContainer.innerHTML = `<button class="success" onclick="UI.closeModal('customDialogModal')">OK</button>`;
+                UI.openModal('customDialogModal');
+            },
+            confirm(msg, onConfirm, title = "Confirm") {
+                document.getElementById('customDialogTitle').innerText = title;
+                document.getElementById('customDialogMessage').innerText = msg;
+                const btnContainer = document.getElementById('customDialogButtons');
+                btnContainer.innerHTML = `
+                    <button style="background:#6b7280;" onclick="UI.closeModal('customDialogModal')">Cancel</button>
+                    <button class="danger" id="dialogConfirmBtn">Confirm</button>
+                `;
+                document.getElementById('dialogConfirmBtn').onclick = () => {
+                    UI.closeModal('customDialogModal');
+                    if(onConfirm) onConfirm();
+                };
+                UI.openModal('customDialogModal');
             }
         };
 
@@ -769,13 +585,57 @@
             }
         };
 
+        const Storage = {
+            validateAndRepair(raw) {
+                const errors = [];
+                let repaired = false;
+
+                if (!raw || typeof raw !== 'object') {
+                    return { valid: false, errors: ['Payload is not a valid JSON object.'] };
+                }
+
+                ['teams', 'people', 'events', 'closures'].forEach(key => {
+                    if (!Array.isArray(raw[key])) {
+                        errors.push(`Key '${key}' missing or invalid array.`);
+                        raw[key] = [];
+                        repaired = true;
+                    }
+                });
+
+                if (raw.people && Array.isArray(raw.people)) {
+                    raw.people.forEach(p => {
+                        if (typeof p.email !== 'string') p.email = "";
+                        if (typeof p.holidayDetails !== 'string') p.holidayDetails = "";
+                        if (typeof p.awayDate !== 'string') p.awayDate = "";
+                    });
+                }
+
+                if (typeof raw.rosters !== 'object' || !raw.rosters) {
+                    errors.push("Key 'rosters' missing or invalid.");
+                    raw.rosters = {};
+                    repaired = true;
+                }
+
+                if (typeof raw.lastSaved !== 'string') {
+                    raw.lastSaved = "";
+                }
+
+                return {
+                    valid: errors.length === 0,
+                    repaired,
+                    errors,
+                    data: raw,
+                    repairedData: raw
+                };
+            }
+        };
+
         const Utilities = {
             recalcRosters() {
-                Store.createRosterBackup();
                 CoreLogic.recalculateRosters();
                 UI.closeModal('utilitiesModal');
-                UI.setStatusMessage('Roster backup created & rosters recalculated.');
-                alert('Rosters successfully recalculated. A safety backup of your previous roster was created.');
+                UI.setStatusMessage('Rosters recalculated and pushed to cloud.');
+                Dialog.alert('Rosters successfully recalculated and updated for all users.');
             },
 
             displayUnavailable() {
@@ -829,6 +689,54 @@
                 }
 
                 UI.openModal('unavailableListModal');
+            },
+
+            exportData() {
+                const dataStr = JSON.stringify(Store.data, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                const exportFileDefaultName = `RosterMatic_Backup_${Utils.formatDate(new Date())}.json`;
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+            },
+
+            triggerImport() {
+                Dialog.confirm("Are you sure? Importing a file will completely overwrite your existing database and rosters for all users.", () => {
+                    document.getElementById('importFileInput').click();
+                }, "Warning: Overwrite Data");
+            },
+
+            handleImport(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const rawData = JSON.parse(e.target.result);
+                        const validated = Storage.validateAndRepair(rawData);
+                        
+                        if (validated.valid || validated.repaired) {
+                            Store.data = validated.valid ? validated.data : validated.repairedData;
+                            Store.rebuildCaches();
+                            CoreLogic.recalculateRosters();
+                            CloudSync.save(true);
+                            
+                            UI.closeModal('utilitiesModal');
+                            UI.renderRoster();
+                            UI.refreshCurrentPanel();
+                            Dialog.alert("Data successfully imported and synced to the cloud.", "Import Complete");
+                        } else {
+                            Dialog.alert("The selected file contains invalid data.", "Import Error");
+                        }
+                    } catch (error) {
+                        console.error("Import error:", error);
+                        Dialog.alert("Could not parse the selected file. Ensure it is a valid RosterMatic JSON backup.", "Import Error");
+                    }
+                    event.target.value = '';
+                };
+                reader.readAsText(file);
             }
         };
 
@@ -1075,7 +983,6 @@
                                     Store.data.rosters[weekKey][ev.id] = [];
                                 }
 
-                                // 1. Preserve valid manual changes/assignments
                                 const currentAssigned = Store.data.rosters[weekKey][ev.id];
                                 const keptAssignments = currentAssigned.filter(pId => {
                                     const p = Store.cache.peopleMap.get(pId);
@@ -1084,7 +991,6 @@
 
                                 const maxLimit = ev.maxPeople || 99;
 
-                                // 2. Roster team members up to event max capacity
                                 if (ev.teamId && keptAssignments.length < maxLimit) {
                                     const teamMembers = Store.data.people.filter(p => 
                                         p.teamIds?.includes(ev.teamId) && this.isPersonAvailable(p, dateStr)
@@ -1098,7 +1004,6 @@
                                     }
                                 }
 
-                                // 3. Ensure we don't exceed event max
                                 Store.data.rosters[weekKey][ev.id] = keptAssignments.slice(0, maxLimit);
                             }
                         }
@@ -1110,69 +1015,6 @@
             }
         };
 
-        const Storage = {
-            processLoadedJSON(jsonText) {
-                try {
-                    const parsed = JSON.parse(jsonText);
-                    const result = this.validateAndRepair(parsed);
-                    
-                    if (result.valid || result.repairedData) {
-                        Store.data = result.valid ? result.data : result.repairedData;
-                        Store.rebuildCaches();
-                        UI.renderRoster();
-                        UI.setStatusMessage(result.valid ? 'File loaded successfully' : 'Repaired data loaded');
-                        return true;
-                    }
-                } catch (e) {
-                    alert("JSON Syntax Error: File is corrupted and could not be parsed.");
-                }
-                return false;
-            },
-
-            validateAndRepair(raw) {
-                const errors = [];
-                let repaired = false;
-
-                if (!raw || typeof raw !== 'object') {
-                    return { valid: false, errors: ['Root payload is not a valid JSON object.'] };
-                }
-
-                ['teams', 'people', 'events', 'closures'].forEach(key => {
-                    if (!Array.isArray(raw[key])) {
-                        errors.push(`Key '${key}' missing or invalid array.`);
-                        raw[key] = [];
-                        repaired = true;
-                    }
-                });
-
-                if (raw.people && Array.isArray(raw.people)) {
-                    raw.people.forEach(p => {
-                        if (typeof p.email !== 'string') p.email = "";
-                        if (typeof p.holidayDetails !== 'string') p.holidayDetails = "";
-                        if (typeof p.awayDate !== 'string') p.awayDate = "";
-                    });
-                }
-
-                if (typeof raw.rosters !== 'object' || !raw.rosters) {
-                    errors.push("Key 'rosters' missing or invalid.");
-                    raw.rosters = {};
-                    repaired = true;
-                }
-
-                if (typeof raw.lastSaved !== 'string') {
-                    raw.lastSaved = "";
-                }
-
-                return {
-                    valid: errors.length === 0,
-                    repaired,
-                    errors,
-                    data: raw,
-                    repairedData: raw
-                };
-            }
-        };
-
         const UI = {
             setStatusMessage(msg) {
                 const banner = document.getElementById('statusBanner');
@@ -1180,6 +1022,13 @@
                 banner.style.display = 'inline-block';
                 if (Store.statusTimeout) clearTimeout(Store.statusTimeout);
                 Store.statusTimeout = setTimeout(() => { banner.style.display = 'none'; }, 10000);
+            },
+
+            refreshCurrentPanel() {
+                if (Store.activePanelId === 'manageTeamsModal') TeamsManager.populate();
+                if (Store.activePanelId === 'managePeopleModal') PeopleManager.populate();
+                if (Store.activePanelId === 'manageEventsModal') EventsManager.populate();
+                if (Store.activePanelId === 'manageClosedDatesModal') ClosuresManager.populate();
             },
 
             renderRoster() {
@@ -1233,17 +1082,12 @@
                             }
                         }
 
-                        // Traffic Light Status Dot Logic
                         let dotColorClass = '';
                         if (!isClosed) {
                             const count = ev.assigned.length;
-                            if (count < ev.minPeople) {
-                                dotColorClass = 'red';
-                            } else if (count > ev.maxPeople) {
-                                dotColorClass = 'orange';
-                            } else {
-                                dotColorClass = 'green';
-                            }
+                            if (count < ev.minPeople) dotColorClass = 'red';
+                            else if (count > ev.maxPeople) dotColorClass = 'orange';
+                            else dotColorClass = 'green';
                         }
 
                         const statusDotHtml = !isClosed ? `<span class="status-dot ${dotColorClass}"></span>` : '';
@@ -1269,17 +1113,12 @@
             },
 
             togglePanel(id) {
-                if (Store.activePanelId === id) {
-                    this.closePanel(id);
-                } else {
-                    this.openPanel(id);
-                }
+                if (Store.activePanelId === id) this.closePanel(id);
+                else this.openPanel(id);
             },
 
             openPanel(id) {
-                if (Store.activePanelId && Store.activePanelId !== id) {
-                    this.closePanel(Store.activePanelId);
-                }
+                if (Store.activePanelId && Store.activePanelId !== id) this.closePanel(Store.activePanelId);
                 const panel = document.getElementById(id);
                 const overlay = document.getElementById('panelOverlay');
                 overlay.style.display = 'block';
@@ -1290,11 +1129,7 @@
                 overlay.classList.add('open');
                 panel.classList.add('open');
                 Store.activePanelId = id;
-
-                if (id === 'manageTeamsModal') TeamsManager.populate();
-                if (id === 'managePeopleModal') PeopleManager.populate();
-                if (id === 'manageEventsModal') EventsManager.populate();
-                if (id === 'manageClosedDatesModal') ClosuresManager.populate();
+                this.refreshCurrentPanel();
             },
 
             closePanel(id) {
@@ -1304,36 +1139,20 @@
                 panel.classList.remove('open');
                 overlay.classList.remove('open');
                 
-                if (Store.activePanelId === id) {
-                    Store.activePanelId = null;
-                }
+                if (Store.activePanelId === id) Store.activePanelId = null;
 
                 setTimeout(() => {
-                    if (!panel.classList.contains('open')) {
-                        panel.style.display = 'none';
-                    }
-                    if (!Store.activePanelId) {
-                        overlay.style.display = 'none';
-                    }
+                    if (!panel.classList.contains('open')) panel.style.display = 'none';
+                    if (!Store.activePanelId) overlay.style.display = 'none';
                 }, 250);
             },
 
             closeAllPanels() {
-                if (Store.activePanelId) {
-                    this.closePanel(Store.activePanelId);
-                }
+                if (Store.activePanelId) this.closePanel(Store.activePanelId);
             },
 
-            openModal(id) {
-                document.getElementById(id).style.display = 'flex';
-            },
-
+            openModal(id) { document.getElementById(id).style.display = 'flex'; },
             closeModal(id) { document.getElementById(id).style.display = 'none'; },
-
-            showDataErrors(errors) {
-                document.getElementById('dataErrorLog').innerHTML = errors.map(e => `• ${e}`).join('<br>');
-                this.openModal('dataErrorModal');
-            },
 
             openEventModal(weekKey, ev) {
                 document.getElementById('modalTitle').innerText = ev.title;
@@ -1434,12 +1253,12 @@
                 document.getElementById('teamFormTitle').innerText = 'Edit Team';
             },
             delete(id) {
-                if (confirm("Delete team?")) {
+                Dialog.confirm("Are you sure you want to delete this team?", () => {
                     Store.data.teams = Store.data.teams.filter(t => t.id !== id);
                     Store.data.people.forEach(p => p.teamIds = p.teamIds.filter(t => t !== id));
                     Store.data.events.forEach(ev => { if (ev.teamId === id) ev.teamId = ""; });
                     Store.rebuildCaches(); CoreLogic.recalculateRosters(); this.populate();
-                }
+                });
             },
             resetForm() {
                 document.getElementById('editTeamId').value = '';
@@ -1553,17 +1372,14 @@
                 const p = Store.cache.peopleMap.get(id); if (!p) return;
                 let rosterCount = 0;
                 Object.values(Store.data.rosters).forEach(w => Object.values(w).forEach(arr => { if (arr.includes(id)) rosterCount++; }));
-                document.getElementById('deletePersonName').innerText = p.name;
-                document.getElementById('deletePersonTeamsCount').innerText = p.teamIds.length;
-                document.getElementById('deletePersonRostersCount').innerText = rosterCount;
-                document.getElementById('confirmDeleteBtn').onclick = () => {
+                
+                Dialog.confirm(`Are you sure you want to permanently delete ${p.name}? They will be removed from ${p.teamIds.length} teams and unassigned from ${rosterCount} scheduled events.`, () => {
                     Store.data.people = Store.data.people.filter(item => item.id !== id);
                     Object.keys(Store.data.rosters).forEach(w => Object.keys(Store.data.rosters[w]).forEach(eKey => {
                         Store.data.rosters[w][eKey] = Store.data.rosters[w][eKey].filter(pId => pId !== id);
                     }));
-                    UI.closeModal('confirmDeleteModal'); Store.rebuildCaches(); Store.autoSave(); UI.renderRoster(); this.populate();
-                };
-                UI.openModal('confirmDeleteModal');
+                    Store.rebuildCaches(); Store.autoSave(); UI.renderRoster(); this.populate();
+                });
             },
 
             resetForm() {
@@ -1619,7 +1435,7 @@
                 const maxPeople = parseInt(document.getElementById('eventMaxInput').value);
                 const time = document.getElementById('eventTimeInput').value;
 
-                if (minPeople > maxPeople) return alert("Min staff cannot exceed Max staff.");
+                if (minPeople > maxPeople) return Dialog.alert("Min staff cannot exceed Max staff.");
 
                 const payload = { type, title, location, teamId, minPeople, maxPeople, time };
                 if (type === 'SPECIAL') {
@@ -1677,10 +1493,10 @@
                 document.getElementById('eventFormTitle').innerText = 'Edit Event';
             },
             delete(id) {
-                if (confirm("Delete event?")) {
+                Dialog.confirm("Are you sure you want to remove this event completely?", () => {
                     Store.data.events = Store.data.events.filter(e => e.id !== id);
                     Store.rebuildCaches(); CoreLogic.recalculateRosters(); this.populate();
-                }
+                });
             },
             resetForm() {
                 document.getElementById('editEventId').value = '';
@@ -1726,7 +1542,7 @@
                 let endDate = document.getElementById('closureEndDate').value || startDate;
                 const target = document.getElementById('closureTargetSelect').value;
 
-                if (startDate > endDate) return alert("Start date cannot be after End date.");
+                if (startDate > endDate) return Dialog.alert("Start date cannot be after End date.");
 
                 const payload = { type, name, startDate, endDate, target: type === 'INFO' ? 'NONE' : (target === "ALL" ? "ALL" : parseInt(target)) };
                 if (id) {
@@ -1752,12 +1568,12 @@
                 document.getElementById('closureFormTitle').innerText = 'Edit Calendar Entry';
             },
             delete(id) {
-                if (confirm("Remove calendar entry?")) {
+                Dialog.confirm("Remove this calendar entry?", () => {
                     Store.data.closures = Store.data.closures.filter(c => c.id !== id);
                     Store.rebuildCaches(); 
                     CoreLogic.recalculateRosters(); 
                     this.populate();
-                }
+                });
             },
             resetForm() {
                 document.getElementById('editClosureId').value = '';
@@ -1773,7 +1589,7 @@
 
         const ExportManager = {
             openShareModal() {
-                if (Store.selectedWeeks.size === 0) return alert("Select at least one week first.");
+                if (Store.selectedWeeks.size === 0) return Dialog.alert("Please check at least one week box first to share.");
                 const selected = Utils.getNext10Weeks().filter(w => Store.selectedWeeks.has(Utils.formatDate(w))).sort((a,b) => a-b);
                 let out = "";
 
@@ -1820,10 +1636,10 @@
             copyShareText() {
                 const text = document.getElementById('shareTextOutput');
                 text.select();
-                navigator.clipboard.writeText(text.value).then(() => alert("Copied!")).catch(() => alert("Copy failed."));
+                navigator.clipboard.writeText(text.value).then(() => Dialog.alert("Copied to clipboard!")).catch(() => Dialog.alert("Copy failed. Try selecting manually."));
             },
             exportCSV() {
-                if (Store.selectedWeeks.size === 0) return alert("Select at least one week first.");
+                if (Store.selectedWeeks.size === 0) return Dialog.alert("Please check at least one week box first to export.");
                 let csv = "data:text/csv;charset=utf-8,Week Start,Weekday,Date,Time,Location,Event,Rostered\n";
                 Utils.getNext10Weeks().filter(w => Store.selectedWeeks.has(Utils.formatDate(w))).forEach(w => {
                     const wKey = Utils.formatDate(w);
@@ -1833,20 +1649,48 @@
                         csv += `"${wKey}","${wDay}","${ev.dateStr}","${ev.time}","${ev.location}","${ev.title}","${names}"\n`;
                     });
                 });
+                const encodedUri = encodeURI(csv);
                 const link = document.createElement("a");
-                link.href = encodeURI(csv);
-                link.download = `RosterMaticExport.csv`;
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `Roster_Export_${Utils.formatDate(new Date())}.csv`);
+                document.body.appendChild(link);
                 link.click();
-                UI.closeModal('utilitiesModal');
+                document.body.removeChild(link);
             }
         };
 
-        window.addEventListener('DOMContentLoaded', () => {
-            Store.data = { teams: [], people: [], events: [], closures: [], rosters: {}, lastSaved: "" };
-            Store.rebuildCaches();
-            UI.renderRoster();
-            FileFS.init();
-        });
+        window.UI = UI;
+        window.Store = Store;
+        window.CoreLogic = CoreLogic;
+        window.Utils = Utils;
+        window.TeamsManager = TeamsManager;
+        window.PeopleManager = PeopleManager;
+        window.EventsManager = EventsManager;
+        window.ClosuresManager = ClosuresManager;
+        window.ExportManager = ExportManager;
+        window.Utilities = Utilities;
+        window.Simulation = Simulation;
+        window.Dialog = Dialog;
+
+        async function initFirebase() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                // Once authenticated, start syncing
+                CloudSync.init();
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                document.getElementById('syncBadge').className = 'sync-badge error';
+                document.getElementById('syncBadge').innerText = 'Auth Error';
+                Dialog.alert("Could not connect to the real-time server.", "Connection Error");
+            }
+        }
+
+        // Boot
+        initFirebase();
     </script>
 </body>
 </html>
