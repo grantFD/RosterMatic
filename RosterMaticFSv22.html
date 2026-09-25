@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RosterMatic</title>
+    <style>
+        :root {
+            --bg: #f4f4f9;
+            --surface: #ffffff;
+            --current-week-bg: #eef2ff;
+            --current-week-border: #c7d2fe;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --success: #10b981;
+            --success-hover: #059669;
+            --warning: #f59e0b;
+            --warning-hover: #d97706;
+            --danger: #ef4444;
+            --closed: #6b7280;
+            --closed-bg: #f3f4f6;
+            --closed-border: #9ca3af;
+            --text: #1f2937;
+            --border: #e5e7eb;
+            --toolbar-height: 70px;
+        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; padding: 0 20px 20px 20px; background-color: var(--bg); color: var(--text); }
+        
+        .app-title-container { display: flex; align-items: center; gap: 12px; margin-top: 15px; margin-bottom: 15px; }
+        .app-title-container h1 { margin: 0; font-size: 1.5rem; }
+        .status-banner { font-size: 0.95rem; font-weight: 600; color: #4b5563; background: #e0e7ff; padding: 4px 10px; border-radius: 4px; display: none; }
+
+        .toolbar { 
+            position: sticky; top: 0; z-index: 100; display: flex; flex-wrap: wrap; gap: 8px; 
+            padding: 12px 15px; background: var(--surface); border-bottom: 1px solid var(--border);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); align-items: center; min-height: var(--toolbar-height);
+        }
+
+        button { padding: 8px 14px; border: none; border-radius: 6px; background: var(--primary); color: white; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+        button:hover { background: var(--primary-hover); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .danger { background: var(--danger); } .danger:hover { background: #dc2626; }
+        .success { background: var(--success); } .success:hover { background: var(--success-hover); }
+        .warning { background: var(--warning); color: #fff; } .warning:hover { background: var(--warning-hover); }
+        .btn-sm { padding: 4px 8px; font-size: 0.8rem; }
+        
+        .file-status-container { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .fallback-badge { background: #f59e0b; color: #ffffff; font-size: 0.75rem; font-weight: 700; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; display: none; }
+
+        .roster-container { display: flex; flex-direction: column; gap: 20px; }
+        .week-card { background: var(--surface); padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 2px solid transparent; }
+        .week-card.current-week { background: var(--current-week-bg); border-color: var(--current-week-border); }
+        .week-header { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; border-bottom: 2px solid var(--border); padding-bottom: 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .week-header input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .events-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+        .event-card { border: 1px solid var(--border); padding: 12px; border-radius: 6px; cursor: pointer; transition: transform 0.1s; background: #fafafa; }
+        .event-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .event-card.understaffed { border-left: 4px solid var(--danger); background: #fef2f2; }
+        .event-card.special-event { border-top: 3px solid var(--warning); }
+        .event-card.closed-event { border: 1px dashed var(--closed-border); border-top: 4px solid var(--closed); background: var(--closed-bg); opacity: 0.85; cursor: not-allowed; }
+        .event-card.closed-event:hover { transform: none; box-shadow: none; }
+        .event-title { font-weight: bold; margin-bottom: 5px; display: flex; align-items: center; justify-content: space-between; }
+        .event-meta { font-size: 0.85rem; color: #6b7280; margin-bottom: 10px; }
+        .event-roster, .event-away { font-size: 0.9rem; word-wrap: break-word; white-space: normal; }
+        .event-away { font-size: 0.85rem; margin-top: 6px; color: var(--danger); }
+
+        /* Status Dot Styles */
+        .status-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; margin-left: 8px; }
+        .status-dot.red { background-color: var(--danger); }
+        .status-dot.orange { background-color: var(--warning); }
+        .status-dot.green { background-color: var(--success); }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        #confirmDeleteModal { z-index: 1100; } #dataErrorModal { z-index: 1200; } #unavailableListModal { z-index: 1150; } #initFileModal, #permissionModal { z-index: 1300; }
+        .modal { background: var(--surface); padding: 25px; border-radius: 8px; width: 90%; max-width: 650px; max-height: 90vh; overflow-y: auto; }
+        .modal-close { float: right; cursor: pointer; font-size: 1.5rem; font-weight: bold; line-height: 1; }
+
+        .panel-overlay { display: none; position: fixed; top: var(--toolbar-height); left: 0; width: 100%; height: calc(100vh - var(--toolbar-height)); background: rgba(0,0,0,0.3); z-index: 90; opacity: 0; transition: opacity 0.25s ease-in-out; }
+        .panel-overlay.open { opacity: 1; }
+        .slide-panel { position: fixed; top: var(--toolbar-height); left: 0; width: 850px; max-width: 90vw; height: calc(100vh - var(--toolbar-height)); background: var(--surface); box-shadow: 4px 0 15px rgba(0,0,0,0.15); z-index: 95; transform: translateX(-100%); transition: transform 0.25s ease-in-out; display: flex; flex-direction: column; }
+        .slide-panel.open { transform: translateX(0); }
+        .panel-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #fafafa; }
+        .panel-header h2 { margin: 0; font-size: 1.3rem; }
+        .panel-body { display: flex; flex: 1; overflow: hidden; }
+        .panel-form-col { width: 340px; min-width: 320px; padding: 20px; border-right: 1px solid var(--border); overflow-y: auto; background: #fff; }
+        .panel-list-col { flex: 1; padding: 20px; overflow-y: auto; background: #fafafa; }
+
+        @media (max-width: 768px) {
+            .slide-panel { width: 100vw; max-width: 100vw; }
+            .panel-body { flex-direction: column; overflow-y: auto; }
+            .panel-form-col { width: 100%; min-width: 100%; border-right: none; border-bottom: 1px solid var(--border); overflow-y: visible; }
+            .panel-list-col { width: 100%; overflow-y: visible; }
+        }
+
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; }
+        .form-row { display: flex; gap: 10px; }
+        .form-row .form-group { flex: 1; }
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 10px; max-height: 140px; overflow-y: auto; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: #fff; }
+        .checkbox-group label { font-weight: normal; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        .checkbox-group input { width: auto; }
+        .person-list { list-style: none; padding: 0; margin: 0; }
+        .person-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; background: #fff; }
+        .status-away { color: var(--danger); font-size: 0.85rem; font-weight: 500; }
+        .management-section { background: #fafafa; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .actions-cell { display: flex; gap: 5px; }
+        .badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: #e5e7eb; margin-left: 5px; font-weight: 600; }
+        .badge-special { background: #feefc3; color: #b45309; }
+        .badge-closed { background: #e5e7eb; color: #374151; font-weight: bold; border: 1px solid #9ca3af; }
+        .badge-info { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+        .badge-current { background: #dbeafe; color: #1e40af; margin-left: 8px; }
+        .error-log { background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; max-height: 200px; overflow-y: auto; }
+        textarea.share-output { width: 100%; height: 250px; font-family: monospace; font-size: 0.9rem; white-space: pre-wrap; margin-bottom: 15px; resize: vertical; }
+        .sim-bar-inline { background: #fef3c7; border: 1px solid #f59e0b; padding: 12px; border-radius: 6px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .sim-bar-inline .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .utility-option { display: flex; gap: 15px; align-items: center; padding: 12px; background: #fff; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 10px; }
+        .utility-option .btn-col { width: 180px; flex-shrink: 0; }
+        .utility-option .btn-col button { width: 100%; }
+        .utility-option .desc-col { font-size: 0.88rem; color: #4b5563; line-height: 1.3; }
+    </style>
+</head>
+<body>
+
+    <div class="toolbar">
+        <button class="success" onclick="UI.togglePanel('manageTeamsModal')">Teams</button>
+        <button class="success" onclick="UI.togglePanel('managePeopleModal')">People</button>
+        <button class="success" onclick="UI.togglePanel('manageEventsModal')">Events</button>
+        <button class="success" onclick="UI.togglePanel('manageClosedDatesModal')">Calendar</button>
+        <span style="border-left: 2px solid var(--border); margin: 0 4px; height: 24px;"></span>
+        <button style="background: #374151;" onclick="UI.openModal('utilitiesModal')">Utilities</button>
+        <button class="warning" onclick="ExportManager.openShareModal()">Share</button>
+
+        <div class="file-status-container">
+            <span id="fallbackBadge" class="fallback-badge">Fallback</span>
+            <span id="lastSavedDisplay" style="font-size: 0.9rem; color: #4b5563;">Updated: Never</span>
+        </div>
+    </div>
+
+    <div class="app-title-container">
+        <h1>RosterMatic</h1>
+        <span id="statusBanner" class="status-banner"></span>
+    </div>
+
+    <div class="roster-container" id="rosterContainer"></div>
+
+    <div class="panel-overlay" id="panelOverlay" onclick="UI.closeAllPanels()"></div>
+
+    <!-- Initialization Modal for Initial Setup -->
+    <div class="modal-overlay" id="initFileModal">
+        <div class="modal">
+            <h2>Welcome to RosterMatic</h2>
+            <p style="color: #4b5563; margin-bottom: 20px;">No existing data file was found. Would you like to create a new one with a minimal set of sample data, or open an existing RosterMasterData.json file?</p>
+            <div style="display:flex; gap: 10px;">
+                <button class="success" onclick="FileFS.createNewFile()">Create New Data File</button>
+                <button style="background: #2563eb;" onclick="FileFS.openExistingFile()">Open Existing File</button>
+            </div>
+            <input type="file" id="fallbackFileInput" style="display: none;" accept=".json" onchange="FileFS.handleFallbackOpen(event)">
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="permissionModal">
+        <div class="modal">
+            <h2>Restore File Access</h2>
+            <p style="color: #4b5563; margin-bottom: 20px;">Please grant permission to read and auto-save to your existing RosterMasterData.json file to continue working.</p>
+            <div style="display:flex; justify-content: flex-end; gap: 10px;">
+                <button style="background: #6b7280;" onclick="FileFS.cancelPermissionRequest()">Choose Another File</button>
+                <button id="grantAccessBtn" class="success" onclick="FileFS.grantPermission()">Grant Access</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-panel" id="manageTeamsModal">
+        <div class="panel-header">
+            <h2>Manage Teams</h2>
+            <span class="modal-close" onclick="UI.closePanel('manageTeamsModal')">&times;</span>
+        </div>
+        <div class="panel-body">
+            <div class="panel-form-col">
+                <h3 id="teamFormTitle">Add New Team</h3>
+                <form onsubmit="TeamsManager.save(event)">
+                    <input type="hidden" id="editTeamId">
+                    <div class="form-group"><label>Team Name</label><input type="text" id="teamNameInput" required></div>
+                    <div class="form-group"><label>Assign Members</label><div class="checkbox-group" id="teamPeopleCheckboxes"></div></div>
+                    <div style="display:flex; gap: 8px; margin-top: 15px;">
+                        <button type="submit" class="success" id="teamSubmitBtn" style="flex:1;">Save Team</button>
+                        <button type="button" onclick="TeamsManager.resetForm()" style="background:#6b7280;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+            <div class="panel-list-col">
+                <h3 id="teamsListHeading">Existing Teams (0)</h3>
+                <ul id="teamsList" class="person-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-panel" id="managePeopleModal">
+        <div class="panel-header">
+            <h2>Manage People</h2>
+            <span class="modal-close" onclick="UI.closePanel('managePeopleModal')">&times;</span>
+        </div>
+        <div class="panel-body">
+            <div class="panel-form-col">
+                <h3 id="personFormTitle">Add New Person</h3>
+                <form onsubmit="PeopleManager.save(event)">
+                    <input type="hidden" id="editPersonId">
+                    <div class="form-group"><label>Name</label><input type="text" id="personNameInput" required></div>
+                    <div class="form-group"><label>Email Address</label><input type="email" id="personEmailInput" placeholder="e.g. alex@example.com"></div>
+                    <div class="form-group"><label>Assigned Teams</label><div class="checkbox-group" id="personTeamCheckboxes"></div></div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Active From</label><input type="date" id="personActiveFrom"></div>
+                        <div class="form-group"><label>Active Until</label><input type="date" id="personActiveUntil"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Holiday Start</label><input type="date" id="personHolidayStart"></div>
+                        <div class="form-group"><label>Holiday End</label><input type="date" id="personHolidayEnd"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Holiday Details</label>
+                        <input type="text" id="personHolidayDetails" placeholder="e.g. Annual leave, overseas trip">
+                    </div>
+                    <div class="form-group">
+                        <label>Away Date (Select Rostered Date)</label>
+                        <select id="personAwayDateSelect">
+                            <option value="">-- No Away Date Selected --</option>
+                        </select>
+                        <small style="color: #6b7280; display: block; margin-top: 4px;">Chosen from the next 10 rostered dates for this person.</small>
+                    </div>
+                    <div style="display:flex; gap: 8px; margin-top: 15px;">
+                        <button type="submit" class="success" id="personSubmitBtn" style="flex:1;">Save Person</button>
+                        <button type="button" onclick="PeopleManager.resetForm()" style="background:#6b7280;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+            <div class="panel-list-col">
+                <h3 id="peopleListHeading">Current Staff (0)</h3>
+                <ul id="peopleList" class="person-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-panel" id="manageEventsModal">
+        <div class="panel-header">
+            <h2>Manage Events</h2>
+            <span class="modal-close" onclick="UI.closePanel('manageEventsModal')">&times;</span>
+        </div>
+        <div class="panel-body">
+            <div class="panel-form-col">
+                <h3 id="eventFormTitle">Add New Event</h3>
+                <form onsubmit="EventsManager.save(event)">
+                    <input type="hidden" id="editEventId">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Event Type</label>
+                            <select id="eventTypeSelect" onchange="EventsManager.toggleTypeFields()" required>
+                                <option value="REGULAR">Regular (Recurring)</option>
+                                <option value="SPECIAL">Special (One-off)</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Title</label><input type="text" id="eventTitleInput" required></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Location</label><input type="text" id="eventLocationInput" required></div>
+                        <div class="form-group"><label>Team</label><select id="eventTeamSelect"></select></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Min Staff</label><input type="number" id="eventMinInput" required min="0" value="1"></div>
+                        <div class="form-group"><label>Max Staff</label><input type="number" id="eventMaxInput" required min="1" value="2"></div>
+                    </div>
+                    <div class="form-group"><label>Time</label><input type="time" id="eventTimeInput" required></div>
+                    
+                    <div id="specialEventGroup" class="form-group" style="display:none;">
+                        <label>Event Date</label><input type="date" id="eventSpecialDate">
+                    </div>
+                    <div id="regularEventGroup">
+                        <div class="form-group">
+                            <label>Recurrence Pattern</label>
+                            <select id="eventRecurrenceType" onchange="EventsManager.toggleRecurrenceFields()">
+                                <option value="WEEKLY">Weekly / Multi-Week Interval</option>
+                                <option value="MONTHLY_NTH">Monthly (Nth Weekday)</option>
+                            </select>
+                        </div>
+                        <div class="form-row" id="weeklyOptions">
+                            <div class="form-group"><label>Interval (Wks)</label><input type="number" id="eventWeekInterval" min="1" value="1"></div>
+                            <div class="form-group">
+                                <label>Day</label>
+                                <select id="eventDaySelect">
+                                    <option value="1">Mon</option><option value="2">Tue</option><option value="3">Wed</option>
+                                    <option value="4">Thu</option><option value="5">Fri</option><option value="6">Sat</option><option value="0">Sun</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row" id="monthlyOptions" style="display:none;">
+                            <div class="form-group">
+                                <label>Order</label>
+                                <select id="eventNthOrder">
+                                    <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="5">Last</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Day</label>
+                                <select id="eventNthDaySelect">
+                                    <option value="1">Mon</option><option value="2">Tue</option><option value="3">Wed</option>
+                                    <option value="4">Thu</option><option value="5">Fri</option><option value="6">Sat</option><option value="0">Sun</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Active From</label><input type="date" id="eventStartDate"></div>
+                            <div class="form-group"><label>Active Until</label><input type="date" id="eventEndDate"></div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap: 8px; margin-top: 15px;">
+                        <button type="submit" class="success" id="eventSubmitBtn" style="flex:1;">Save Event</button>
+                        <button type="button" onclick="EventsManager.resetForm()" style="background:#6b7280;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+            <div class="panel-list-col">
+                <h3 id="eventsListHeading">Current Events (0)</h3>
+                <ul id="eventsList" class="person-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-panel" id="manageClosedDatesModal">
+        <div class="panel-header">
+            <h2>Calendar & Closed Dates</h2>
+            <span class="modal-close" onclick="UI.closePanel('manageClosedDatesModal')">&times;</span>
+        </div>
+        <div class="panel-body">
+            <div class="panel-form-col">
+                <h3 id="closureFormTitle">Add Calendar Entry</h3>
+                <form onsubmit="ClosuresManager.save(event)">
+                    <input type="hidden" id="editClosureId">
+                    <div class="form-group">
+                        <label>Entry Type</label>
+                        <select id="closureTypeSelect" onchange="ClosuresManager.toggleTypeFields()" required>
+                            <option value="CLOSURE">Hub Closure (Blocks Rostering)</option>
+                            <option value="INFO">Informational Event (Header Banner)</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Title / Name</label><input type="text" id="closureNameInput" required></div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Start Date</label><input type="date" id="closureStartDate" required></div>
+                        <div class="form-group"><label>End Date</label><input type="date" id="closureEndDate"></div>
+                    </div>
+                    <div class="form-group" id="closureTargetGroup"><label>Apply Closure To</label><select id="closureTargetSelect"></select></div>
+                    <div style="display:flex; gap: 8px; margin-top: 15px;">
+                        <button type="submit" class="success" id="closureSubmitBtn" style="flex:1;">Save Entry</button>
+                        <button type="button" onclick="ClosuresManager.resetForm()" style="background:#6b7280;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+            <div class="panel-list-col">
+                <h3 id="closuresListHeading">Configured Entries (0)</h3>
+                <ul id="closuresList" class="person-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="utilitiesModal">
+        <div class="modal">
+            <span class="modal-close" onclick="UI.closeModal('utilitiesModal')">&times;</span>
+            <h2>Utilities & Tools</h2>
+            
+            <div class="utility-option" style="background: #eef2ff; border-color: #c7d2fe;">
+                <div class="btn-col"><button class="warning" onclick="Utilities.displayUnavailable()">Planned Holidays</button></div>
+                <div class="desc-col">View all staff who are away or on holiday from now through the end of the roster period.</div>
+            </div>
+
+            <div class="sim-bar-inline">
+                <strong>Time Simulation</strong>
+                <div class="controls">
+                    <span>Mock Date: <input type="date" id="simDateInput" onchange="Simulation.setDate(this.value)"></span>
+                    <button class="btn-sm warning" onclick="Simulation.advanceWeeks(1)">+1 Wk</button>
+                    <button class="btn-sm warning" onclick="Simulation.advanceWeeks(4)">+4 Wks</button>
+                    <button class="btn-sm" onclick="Simulation.reset()">Reset System Date</button>
+                </div>
+            </div>
+
+            <h3>Export CSV Data</h3>
+            <div class="utility-option">
+                <div class="btn-col"><button onclick="ExportManager.exportCSV()">Export Selected CSV</button></div>
+                <div class="desc-col">Export all currently checked week rosters into CSV spreadsheet format.</div>
+            </div>
+
+            <h3>Data & Roster Maintenance</h3>
+            <div class="utility-option">
+                <div class="btn-col"><button class="success" onclick="Utilities.recalcRosters()">Recalculate Rosters</button></div>
+                <div class="desc-col">Backs up current rosters and forces a complete recalculation and re-population while preserving manual changes.</div>
+            </div>
+            <div style="display:flex; justify-content: flex-end; margin-top: 15px;">
+                <button type="button" onclick="UI.closeModal('utilitiesModal')" style="background:#6b7280;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="unavailableListModal">
+        <div class="modal">
+            <span class="modal-close" onclick="UI.closeModal('unavailableListModal')">&times;</span>
+            <h2>Planned Holidays & Away Staff</h2>
+            <p style="color: #4b5563; font-size: 0.9rem;">Staff away or on holiday from today through end of current roster period:</p>
+            <ul id="unavailableListContent" class="person-list" style="margin-top: 15px;"></ul>
+            <div style="display:flex; justify-content: flex-end; margin-top: 15px;">
+                <button type="button" onclick="UI.closeModal('unavailableListModal')" style="background:#6b7280;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="shareModal">
+        <div class="modal">
+            <span class="modal-close" onclick="UI.closeModal('shareModal')">&times;</span>
+            <h2>Share Rosters</h2>
+            <div class="form-group"><textarea id="shareTextOutput" class="share-output" readonly></textarea></div>
+            <div style="display:flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" onclick="UI.closeModal('shareModal')" style="background:#6b7280;">Close</button>
+                <button type="button" class="success" onclick="ExportManager.copyShareText()">Copy to Clipboard</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="eventModal">
+        <div class="modal">
+            <span class="modal-close" onclick="UI.closeModal('eventModal')">&times;</span>
+            <h2 id="modalTitle">Event Details</h2>
+            <div id="modalMeta" class="event-meta"></div>
+            <h3 id="rosteredListHeading">Currently Rostered (0)</h3>
+            <ul id="rosteredList" class="person-list"></ul>
+            <h3 id="unavailableListHeading">Unavailable (0)</h3>
+            <ul id="unavailableList" class="person-list"></ul>
+            <h3 id="availableListHeading">Available Staff (0)</h3>
+            <ul id="availableList" class="person-list"></ul>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="confirmDeleteModal">
+        <div class="modal">
+            <span class="modal-close" onclick="UI.closeModal('confirmDeleteModal')">&times;</span>
+            <h2>Confirm Person Deletion</h2>
+            <p>Are you sure you want to remove <strong id="deletePersonName"></strong>?</p>
+            <div class="management-section">
+                <h4>Impacted Items:</h4>
+                <ul>
+                    <li><strong>Team Memberships:</strong> Will be removed from <span id="deletePersonTeamsCount">0</span> teams.</li>
+                    <li><strong>Rostered Events:</strong> Will be unassigned from <span id="deletePersonRostersCount">0</span> rostered events.</li>
+                </ul>
+            </div>
+            <div style="display:flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" onclick="UI.closeModal('confirmDeleteModal')" style="background:#6b7280;">Cancel</button>
+                <button type="button" class="danger" id="confirmDeleteBtn">Permanently Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="dataErrorModal">
+        <div class="modal">
+            <span class="modal-close" onclick="UI.closeModal('dataErrorModal')">&times;</span>
+            <h2 style="color: var(--danger);">Data Validation / File Error</h2>
+            <p id="dataErrorSubtitle">The system encountered errors while validating or reading roster data.</p>
+            <div class="error-log" id="dataErrorLog"></div>
+            <div style="display:flex; justify-content: flex-end; margin-top: 15px;">
+                <button type="button" onclick="UI.closeModal('dataErrorModal')">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DEMO_DATA = {
+            teams: [
+                { id: 101, name: "Morning Support" },
+                { id: 102, name: "Evening Operations" }
+            ],
+            people: [
+                { id: 1, name: "Alex Morgan", email: "alex.morgan@example.com", teamIds: [101], activeFrom: "", activeUntil: "", holidays: [], holidayDetails: "", awayDate: "" },
+                { id: 2, name: "Sam Taylor", email: "sam.taylor@example.com", teamIds: [101, 102], activeFrom: "", activeUntil: "", holidays: [], holidayDetails: "", awayDate: "" },
+                { id: 3, name: "Jordan Lee", email: "jordan.lee@example.com", teamIds: [102], activeFrom: "", activeUntil: "", holidays: [], holidayDetails: "", awayDate: "" }
+            ],
+            events: [
+                { id: 501, type: "REGULAR", title: "Weekday Briefing", location: "Main Hall", teamId: 101, minPeople: 1, maxPeople: 2, time: "09:00", recurrenceType: "WEEKLY", interval: 1, dayOfWeek: 1 },
+                { id: 502, type: "REGULAR", title: "Friday Wrap-Up", location: "Room B", teamId: 102, minPeople: 1, maxPeople: 2, time: "16:00", recurrenceType: "WEEKLY", interval: 1, dayOfWeek: 5 }
+            ],
+            closures: [],
+            rosters: {},
+            lastSaved: ""
+        };
+
+        const IDB = {
+            dbName: 'RosterMaticFS_DB',
+            storeName: 'handles',
+            async getDB() {
+                return new Promise((resolve, reject) => {
+                    const req = indexedDB.open(this.dbName, 1);
+                    req.onupgradeneeded = e => e.target.result.createObjectStore(this.storeName);
+                    req.onsuccess = e => resolve(e.target.result);
+                    req.onerror = e => reject(e.target.error);
+                });
+            },
+            async set(key, val) {
+                const db = await this.getDB();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(this.storeName, 'readwrite');
+                    tx.objectStore(this.storeName).put(val, key);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = e => reject(e.target.error);
+                });
+            },
+            async get(key) {
+                const db = await this.getDB();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(this.storeName, 'readonly');
+                    const req = tx.objectStore(this.storeName).get(key);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = e => reject(e.target.error);
+                });
+            }
+        };
+
+        const FileFS = {
+            fileHandle: null,
+            isFallback: !('showOpenFilePicker' in window),
+            tempHandleForPermission: null,
+            isRequestingPermission: false,
+
+            async init() {
+                if (this.isFallback) {
+                    const badge = document.getElementById('fallbackBadge');
+                    if (badge) {
+                        badge.style.display = 'inline-block';
+                        setTimeout(() => { badge.style.display = 'none'; }, 8000);
+                    }
+                    const fallbackData = await IDB.get('fallbackDataStr');
+                    if (fallbackData) {
+                        Storage.processLoadedJSON(fallbackData);
+                    } else {
+                        UI.openModal('initFileModal');
+                    }
+                } else {
+                    try {
+                        const handle = await IDB.get('appFileHandle');
+                        if (handle) {
+                            const opts = { mode: 'readwrite' };
+                            // Passive query only - does NOT trigger native browser alert dialog
+                            const status = await handle.queryPermission(opts);
+                            if (status === 'granted') {
+                                this.fileHandle = handle;
+                                await this.loadFromFileHandle();
+                            } else {
+                                this.tempHandleForPermission = handle;
+                                UI.openModal('permissionModal');
+                            }
+                        } else {
+                            UI.openModal('initFileModal');
+                        }
+                    } catch (e) {
+                        console.warn('Could not restore file handle:', e);
+                        UI.openModal('initFileModal');
+                    }
+                }
+                this.updateDisplay();
+            },
+
+            async loadFromFileHandle() {
+                try {
+                    const file = await this.fileHandle.getFile();
+                    const text = await file.text();
+                    Storage.processLoadedJSON(text);
+                } catch(e) {
+                    console.error('Error reading from saved file link:', e);
+                    UI.openModal('initFileModal');
+                }
+            },
+
+            async grantPermission() {
+                if (this.isRequestingPermission || !this.tempHandleForPermission) return;
+                
+                this.isRequestingPermission = true;
+                const grantBtn = document.getElementById('grantAccessBtn');
+                if (grantBtn) grantBtn.disabled = true;
+
+                try {
+                    const opts = { mode: 'readwrite' };
+                    // Explicit user gesture stack allows calling requestPermission cleanly
+                    const status = await this.tempHandleForPermission.requestPermission(opts);
+                    
+                    if (status === 'granted') {
+                        this.fileHandle = this.tempHandleForPermission;
+                        this.tempHandleForPermission = null;
+                        UI.closeModal('permissionModal');
+                        await this.loadFromFileHandle();
+                        this.updateDisplay();
+                    } else {
+                        UI.closeModal('permissionModal');
+                        UI.openModal('initFileModal');
+                        UI.setStatusMessage('Permission was not granted. Please select or create a data file.');
+                    }
+                } catch (e) {
+                    console.error("Permission request failed.", e);
+                    UI.closeModal('permissionModal');
+                    UI.openModal('initFileModal');
+                } finally {
+                    this.isRequestingPermission = false;
+                    if (grantBtn) grantBtn.disabled = false;
+                }
+            },
+
+            cancelPermissionRequest() {
+                this.tempHandleForPermission = null;
+                UI.closeModal('permissionModal');
+                UI.openModal('initFileModal');
+            },
+
+            async createNewFile() {
+                Store.data = JSON.parse(JSON.stringify(DEMO_DATA));
+                Store.rebuildCaches();
+                CoreLogic.recalculateRosters();
+                Store.data.lastSaved = new Date().toISOString();
+
+                if (this.isFallback) {
+                    await IDB.set('fallbackDataStr', JSON.stringify(Store.data, null, 2));
+                    UI.closeModal('initFileModal');
+                    UI.renderRoster();
+                    this.updateDisplay();
+                    UI.setStatusMessage('New file created in local storage.');
+                } else {
+                    try {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: 'RosterMasterData.json',
+                            types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }]
+                        });
+                        this.fileHandle = handle;
+                        await IDB.set('appFileHandle', handle);
+                        await this.saveDataToFile(handle);
+                        UI.closeModal('initFileModal');
+                        UI.renderRoster();
+                        this.updateDisplay();
+                        UI.setStatusMessage('New file created successfully.');
+                    } catch (err) {
+                        if (err.name !== 'AbortError') alert('Failed to create file: ' + err.message);
+                    }
+                }
+            },
+
+            async openExistingFile() {
+                if (this.isFallback) {
+                    document.getElementById('fallbackFileInput').click();
+                    return;
+                }
+                try {
+                    const [handle] = await window.showOpenFilePicker({
+                        types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
+                        multiple: false
+                    });
+                    this.fileHandle = handle;
+                    await IDB.set('appFileHandle', handle);
+                    await this.loadFromFileHandle();
+                    UI.closeModal('initFileModal');
+                    this.updateDisplay();
+                } catch (err) {
+                    if (err.name !== 'AbortError') alert('Failed to open file: ' + err.message);
+                }
+            },
+
+            async handleFallbackOpen(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async e => {
+                    const text = e.target.result;
+                    if (Storage.processLoadedJSON(text)) {
+                        await IDB.set('fallbackDataStr', text);
+                        UI.closeModal('initFileModal');
+                        this.updateDisplay();
+                    }
+                    event.target.value = '';
+                };
+                reader.readAsText(file);
+            },
+
+            async saveFile() {
+                if (Store.simulatedDate !== null) return; // Disable saving in simulated time
+                
+                Store.data.lastSaved = new Date().toISOString();
+                const dataStr = JSON.stringify(Store.data, null, 2);
+
+                if (this.isFallback) {
+                    await IDB.set('fallbackDataStr', dataStr);
+                    this.updateDisplay();
+                    return;
+                }
+                
+                if (this.fileHandle) {
+                    try {
+                        await this.saveDataToFile(this.fileHandle, dataStr);
+                        this.updateDisplay();
+                    } catch (err) {
+                        console.error('Error auto-saving file:', err);
+                    }
+                }
+            },
+
+            async saveDataToFile(handle, dataStr = null) {
+                const writable = await handle.createWritable();
+                await writable.write(dataStr || JSON.stringify(Store.data, null, 2));
+                await writable.close();
+            },
+
+            updateDisplay() {
+                const lastSavedEl = document.getElementById('lastSavedDisplay');
+                if (lastSavedEl) {
+                    lastSavedEl.innerText = `Updated: ${Utils.formatShortDateTime(Store.data.lastSaved)}`;
+                }
+            }
+        };
+
+        const Store = {
+            selectedWeeks: new Set(),
+            simulatedDate: null,
+            activePanelId: null,
+            statusTimeout: null,
+            data: { teams: [], people: [], events: [], closures: [], rosters: {}, lastSaved: "" },
+            
+            cache: {
+                teamsMap: new Map(),
+                peopleMap: new Map(),
+                eventsMap: new Map(),
+                closuresMap: new Map()
+            },
+
+            rebuildCaches() {
+                this.cache.teamsMap = new Map(this.data.teams.map(t => [t.id, t]));
+                this.cache.peopleMap = new Map(this.data.people.map(p => [p.id, p]));
+                this.cache.eventsMap = new Map(this.data.events.map(e => [e.id, e]));
+                this.cache.closuresMap = new Map(this.data.closures.map(c => [c.id, c]));
+            },
+
+            createRosterBackup() {
+                if (!this.data.rosters) return;
+                const backupKey = `rosters_backup_${Date.now()}`;
+                this.data[backupKey] = JSON.parse(JSON.stringify(this.data.rosters));
+            },
+
+            autoSave() {
+                FileFS.saveFile();
+            }
+        };
+
+        const Simulation = {
+            getNow() {
+                return Store.simulatedDate ? new Date(Store.simulatedDate) : new Date();
+            },
+            setDate(dateStr) {
+                Store.simulatedDate = dateStr ? Utils.parseLocalDate(dateStr) : null;
+                UI.renderRoster();
+            },
+            advanceWeeks(n) {
+                const current = this.getNow();
+                current.setDate(current.getDate() + (n * 7));
+                Store.simulatedDate = current;
+                document.getElementById('simDateInput').value = Utils.formatDate(current);
+                UI.renderRoster();
+            },
+            reset() {
+                Store.simulatedDate = null;
+                document.getElementById('simDateInput').value = '';
+                UI.renderRoster();
+            }
+        };
+
+        const Utilities = {
+            recalcRosters() {
+                Store.createRosterBackup();
+                CoreLogic.recalculateRosters();
+                UI.closeModal('utilitiesModal');
+                UI.setStatusMessage('Roster backup created & rosters recalculated.');
+                alert('Rosters successfully recalculated. A safety backup of your previous roster was created.');
+            },
+
+            displayUnavailable() {
+                const weeks = Utils.getNext10Weeks();
+                const startDateStr = Utils.formatDate(Simulation.getNow());
+                const endDateObj = new Date(weeks[weeks.length - 1]);
+                endDateObj.setDate(endDateObj.getDate() + 6);
+                const endDateStr = Utils.formatDate(endDateObj);
+
+                const unavailableRecords = [];
+
+                Store.data.people.forEach(person => {
+                    const plans = [];
+
+                    if (person.activeFrom && person.activeFrom > startDateStr) {
+                        plans.push(`Not active until ${Utils.formatReadableDate(person.activeFrom)}`);
+                    }
+                    if (person.activeUntil && person.activeUntil < endDateStr) {
+                        plans.push(`Active period ends ${Utils.formatReadableDate(person.activeUntil)}`);
+                    }
+                    if (person.awayDate && person.awayDate >= startDateStr && person.awayDate <= endDateStr) {
+                        plans.push(`Set as Away on ${Utils.formatReadableDate(person.awayDate)}`);
+                    }
+                    if (person.holidays) {
+                        person.holidays.forEach(h => {
+                            if (h.end >= startDateStr && h.start <= endDateStr) {
+                                const details = person.holidayDetails ? ` (${person.holidayDetails})` : '';
+                                plans.push(`Holiday: ${Utils.formatReadableDate(h.start)} to ${Utils.formatReadableDate(h.end)}${details}`);
+                            }
+                        });
+                    }
+
+                    if (plans.length > 0) {
+                        unavailableRecords.push({ person, plans });
+                    }
+                });
+
+                const listEl = document.getElementById('unavailableListContent');
+                listEl.innerHTML = '';
+
+                if (unavailableRecords.length === 0) {
+                    listEl.innerHTML = '<li><em>No staff are currently marked as away or on holiday during this roster period.</em></li>';
+                } else {
+                    unavailableRecords.sort((a,b) => a.person.name.localeCompare(b.person.name)).forEach(item => {
+                        const li = document.createElement('li');
+                        li.style.flexDirection = 'column';
+                        li.style.alignItems = 'flex-start';
+                        li.innerHTML = `<strong>${item.person.name}</strong><ul style="margin: 4px 0 0 18px; padding: 0; color: #d97706; font-size: 0.88rem;">${item.plans.map(p => `<li>${p}</li>`).join('')}</ul>`;
+                        listEl.appendChild(li);
+                    });
+                }
+
+                UI.openModal('unavailableListModal');
+            }
+        };
+
+        const Utils = {
+            formatDate(date) { 
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            },
+            parseLocalDate(dateStr) {
+                if (!dateStr) return null;
+                return new Date(dateStr + 'T00:00:00');
+            },
+            formatReadableDate(dateStr) {
+                if (!dateStr) return '';
+                return this.parseLocalDate(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+            },
+            formatShortDateTime(isoString) {
+                if (!isoString) return 'Never';
+                const d = new Date(isoString);
+                if (isNaN(d.getTime())) return 'Never';
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mmm = d.toLocaleDateString('en-NZ', { month: 'short' });
+                return `${hh}:${mm} ${dd}-${mmm}`;
+            },
+            getShortDate(date) { 
+                return date.toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' }); 
+            },
+            getNext10Weeks() {
+                const weeks = [];
+                const curr = Simulation.getNow();
+                curr.setHours(0, 0, 0, 0);
+                curr.setDate(curr.getDate() - (curr.getDay() || 7) + 1);
+                for (let i = 0; i < 10; i++) {
+                    const weekStart = new Date(curr);
+                    weekStart.setDate(weekStart.getDate() + (i * 7));
+                    weeks.push(weekStart);
+                }
+                return weeks;
+            }
+        };
+
+        const CoreLogic = {
+            getClosureForEvent(eventId, dateStr) {
+                return Store.data.closures.find(c => {
+                    if (c.type === "INFO") return false;
+                    const start = c.startDate;
+                    const end = c.endDate || c.startDate;
+                    return (dateStr >= start && dateStr <= end) && (c.target === "ALL" || c.target == eventId);
+                }) || null;
+            },
+
+            getWeeklyInfoEvents(weekStart) {
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekEnd.getDate() + 6);
+                const weekStartStr = Utils.formatDate(weekStart);
+                const weekEndStr = Utils.formatDate(weekEnd);
+
+                return Store.data.closures.filter(c => {
+                    if (c.type !== "INFO") return false;
+                    const start = c.startDate;
+                    const end = c.endDate || c.startDate;
+                    return (start <= weekEndStr && end >= weekStartStr);
+                });
+            },
+
+            getPersonUnavailabilityReason(person, dateStr) {
+                if (person.activeFrom && dateStr < person.activeFrom) return `Not active until ${Utils.formatReadableDate(person.activeFrom)}`;
+                if (person.activeUntil && dateStr > person.activeUntil) return `Active period ended ${Utils.formatReadableDate(person.activeUntil)}`;
+                if (person.awayDate && dateStr === person.awayDate) return `Set as Away on ${Utils.formatReadableDate(person.awayDate)}`;
+                if (person.holidays) {
+                    for (let h of person.holidays) {
+                        if (dateStr >= h.start && dateStr <= h.end) {
+                            const detailsStr = person.holidayDetails ? ` (${person.holidayDetails})` : '';
+                            return `On holiday until ${Utils.formatReadableDate(h.end)}${detailsStr}`;
+                        }
+                    }
+                }
+                return null;
+            },
+
+            isPersonAvailable(person, dateStr) {
+                return this.getPersonUnavailabilityReason(person, dateStr) === null;
+            },
+
+            isEventActiveOnDate(ev, dateObj) {
+                const dateStr = Utils.formatDate(dateObj);
+                if (ev.type === "SPECIAL") return ev.specialDate === dateStr;
+                if (ev.startDate && dateStr < ev.startDate) return false;
+                if (ev.endDate && dateStr > ev.endDate) return false;
+
+                const dayOfWeek = dateObj.getDay();
+                if (ev.recurrenceType === "MONTHLY_NTH") {
+                    if (dayOfWeek !== ev.nthDayOfWeek) return false;
+                    const year = dateObj.getFullYear(), month = dateObj.getMonth(), dayOfMonth = dateObj.getDate();
+                    if (ev.nthOrder === 5) {
+                        return (dayOfMonth + 7) > new Date(year, month + 1, 0).getDate();
+                    }
+                    return Math.ceil(dayOfMonth / 7) === ev.nthOrder;
+                } else {
+                    if (dayOfWeek !== ev.dayOfWeek) return false;
+                    if (ev.interval && ev.interval > 1) {
+                        const baseDate = ev.startDate ? Utils.parseLocalDate(ev.startDate) : new Date(2026, 0, 5);
+                        const diffDays = Math.ceil(Math.abs(dateObj - baseDate) / 86400000);
+                        return Math.floor(diffDays / 7) % ev.interval === 0;
+                    }
+                    return true;
+                }
+            },
+
+            getUpcomingRosteredDatesForPerson(person) {
+                const rosteredDates = [];
+                const weeks = Utils.getNext10Weeks();
+                
+                for (let weekStart of weeks) {
+                    const weekEvents = this.generateWeeklyEvents(weekStart);
+                    for (let ev of weekEvents) {
+                        if (ev.assigned.includes(person.id) && !rosteredDates.includes(ev.dateStr)) {
+                            rosteredDates.push(ev.dateStr);
+                            if (rosteredDates.length >= 10) return rosteredDates;
+                        }
+                    }
+                }
+                return rosteredDates;
+            },
+
+            generateWeeklyEvents(weekStart) {
+                const weekKey = Utils.formatDate(weekStart);
+                if (!Store.data.rosters[weekKey]) Store.data.rosters[weekKey] = {};
+                const weekEvents = [];
+
+                Store.data.events.forEach(ev => {
+                    for (let i = 0; i < 7; i++) {
+                        const eventDate = new Date(weekStart);
+                        eventDate.setDate(eventDate.getDate() + i);
+
+                        if (this.isEventActiveOnDate(ev, eventDate)) {
+                            const dateStr = Utils.formatDate(eventDate);
+                            const closure = this.getClosureForEvent(ev.id, dateStr);
+
+                            if (closure) {
+                                Store.data.rosters[weekKey][ev.id] = [];
+                            } else if (!Store.data.rosters[weekKey][ev.id]) {
+                                this.populateRosterForEventDate(weekKey, ev, dateStr);
+                            }
+
+                            const validAssigned = closure ? [] : (Store.data.rosters[weekKey][ev.id] || []).filter(pId => {
+                                const person = Store.cache.peopleMap.get(pId);
+                                return person && this.isPersonAvailable(person, dateStr);
+                            });
+
+                            weekEvents.push({
+                                ...ev,
+                                dateStr,
+                                actualDate: eventDate,
+                                closure,
+                                assigned: validAssigned
+                            });
+                        }
+                    }
+                });
+
+                return weekEvents.sort((a, b) => {
+                    const dateDiff = a.actualDate - b.actualDate;
+                    if (dateDiff !== 0) return dateDiff;
+                    return (a.time || '').localeCompare(b.time || '');
+                });
+            },
+
+            populateRosterForEventDate(weekKey, ev, dateStr) {
+                if (ev.teamId) {
+                    const eligible = Store.data.people.filter(p => this.isPersonAvailable(p, dateStr) && p.teamIds?.includes(ev.teamId));
+                    Store.data.rosters[weekKey][ev.id] = eligible.slice(0, ev.maxPeople).map(p => p.id);
+                } else {
+                    Store.data.rosters[weekKey][ev.id] = [];
+                }
+            },
+
+            syncTeamMembersToRosters(teamId, personId = null) {
+                const weeks = Utils.getNext10Weeks();
+                const todayStr = Utils.formatDate(Simulation.getNow());
+
+                weeks.forEach(weekStart => {
+                    const weekKey = Utils.formatDate(weekStart);
+                    if (!Store.data.rosters[weekKey]) Store.data.rosters[weekKey] = {};
+
+                    Store.data.events.filter(ev => ev.teamId === teamId).forEach(ev => {
+                        for (let i = 0; i < 7; i++) {
+                            const eventDate = new Date(weekStart);
+                            eventDate.setDate(eventDate.getDate() + i);
+                            const dateStr = Utils.formatDate(eventDate);
+
+                            if (this.getClosureForEvent(ev.id, dateStr)) {
+                                Store.data.rosters[weekKey][ev.id] = [];
+                                continue;
+                            }
+
+                            if (dateStr >= todayStr && this.isEventActiveOnDate(ev, eventDate)) {
+                                if (!Store.data.rosters[weekKey][ev.id]) Store.data.rosters[weekKey][ev.id] = [];
+                                const currentAssignments = Store.data.rosters[weekKey][ev.id];
+                                const maxAllowed = ev.maxPeople || 99;
+
+                                const candidates = personId 
+                                    ? Store.data.people.filter(p => p.id === personId)
+                                    : Store.data.people.filter(p => p.teamIds?.includes(teamId));
+
+                                candidates.forEach(person => {
+                                    if (person.teamIds.includes(teamId) && this.isPersonAvailable(person, dateStr)) {
+                                        if (!currentAssignments.includes(person.id) && currentAssignments.length < maxAllowed) {
+                                            currentAssignments.push(person.id);
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                });
+                Store.autoSave();
+            },
+
+            recalculateRosters() {
+                const weeks = Utils.getNext10Weeks();
+
+                weeks.forEach(weekStart => {
+                    const weekKey = Utils.formatDate(weekStart);
+                    if (!Store.data.rosters[weekKey]) Store.data.rosters[weekKey] = {};
+
+                    Store.data.events.forEach(ev => {
+                        for (let i = 0; i < 7; i++) {
+                            const eventDate = new Date(weekStart);
+                            eventDate.setDate(eventDate.getDate() + i);
+                            const dateStr = Utils.formatDate(eventDate);
+
+                            if (this.isEventActiveOnDate(ev, eventDate)) {
+                                if (this.getClosureForEvent(ev.id, dateStr)) {
+                                    Store.data.rosters[weekKey][ev.id] = [];
+                                    continue;
+                                }
+
+                                if (!Store.data.rosters[weekKey][ev.id]) {
+                                    Store.data.rosters[weekKey][ev.id] = [];
+                                }
+
+                                // 1. Preserve valid manual changes/assignments
+                                const currentAssigned = Store.data.rosters[weekKey][ev.id];
+                                const keptAssignments = currentAssigned.filter(pId => {
+                                    const p = Store.cache.peopleMap.get(pId);
+                                    return p && this.isPersonAvailable(p, dateStr);
+                                });
+
+                                const maxLimit = ev.maxPeople || 99;
+
+                                // 2. Roster team members up to event max capacity
+                                if (ev.teamId && keptAssignments.length < maxLimit) {
+                                    const teamMembers = Store.data.people.filter(p => 
+                                        p.teamIds?.includes(ev.teamId) && this.isPersonAvailable(p, dateStr)
+                                    );
+
+                                    for (let p of teamMembers) {
+                                        if (keptAssignments.length >= maxLimit) break;
+                                        if (!keptAssignments.includes(p.id)) {
+                                            keptAssignments.push(p.id);
+                                        }
+                                    }
+                                }
+
+                                // 3. Ensure we don't exceed event max
+                                Store.data.rosters[weekKey][ev.id] = keptAssignments.slice(0, maxLimit);
+                            }
+                        }
+                    });
+                });
+
+                Store.autoSave();
+                UI.renderRoster();
+            }
+        };
+
+        const Storage = {
+            processLoadedJSON(jsonText) {
+                try {
+                    const parsed = JSON.parse(jsonText);
+                    const result = this.validateAndRepair(parsed);
+                    
+                    if (result.valid || result.repairedData) {
+                        Store.data = result.valid ? result.data : result.repairedData;
+                        Store.rebuildCaches();
+                        UI.renderRoster();
+                        UI.setStatusMessage(result.valid ? 'File loaded successfully' : 'Repaired data loaded');
+                        return true;
+                    }
+                } catch (e) {
+                    alert("JSON Syntax Error: File is corrupted and could not be parsed.");
+                }
+                return false;
+            },
+
+            validateAndRepair(raw) {
+                const errors = [];
+                let repaired = false;
+
+                if (!raw || typeof raw !== 'object') {
+                    return { valid: false, errors: ['Root payload is not a valid JSON object.'] };
+                }
+
+                ['teams', 'people', 'events', 'closures'].forEach(key => {
+                    if (!Array.isArray(raw[key])) {
+                        errors.push(`Key '${key}' missing or invalid array.`);
+                        raw[key] = [];
+                        repaired = true;
+                    }
+                });
+
+                if (raw.people && Array.isArray(raw.people)) {
+                    raw.people.forEach(p => {
+                        if (typeof p.email !== 'string') p.email = "";
+                        if (typeof p.holidayDetails !== 'string') p.holidayDetails = "";
+                        if (typeof p.awayDate !== 'string') p.awayDate = "";
+                    });
+                }
+
+                if (typeof raw.rosters !== 'object' || !raw.rosters) {
+                    errors.push("Key 'rosters' missing or invalid.");
+                    raw.rosters = {};
+                    repaired = true;
+                }
+
+                if (typeof raw.lastSaved !== 'string') {
+                    raw.lastSaved = "";
+                }
+
+                return {
+                    valid: errors.length === 0,
+                    repaired,
+                    errors,
+                    data: raw,
+                    repairedData: raw
+                };
+            }
+        };
+
+        const UI = {
+            setStatusMessage(msg) {
+                const banner = document.getElementById('statusBanner');
+                banner.innerText = msg;
+                banner.style.display = 'inline-block';
+                if (Store.statusTimeout) clearTimeout(Store.statusTimeout);
+                Store.statusTimeout = setTimeout(() => { banner.style.display = 'none'; }, 10000);
+            },
+
+            renderRoster() {
+                const container = document.getElementById('rosterContainer');
+                container.innerHTML = '';
+                const weeks = Utils.getNext10Weeks();
+
+                weeks.forEach((weekStart, idx) => {
+                    const weekKey = Utils.formatDate(weekStart);
+                    const events = CoreLogic.generateWeeklyEvents(weekStart);
+                    const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
+                    const isCurrent = idx === 0;
+
+                    const infoEvents = CoreLogic.getWeeklyInfoEvents(weekStart);
+                    const infoBadges = infoEvents.map(ie => `<span class="badge badge-info">ℹ️ ${ie.name} (${Utils.formatReadableDate(ie.startDate)}${ie.endDate && ie.endDate !== ie.startDate ? ' - ' + Utils.formatReadableDate(ie.endDate) : ''})</span>`).join(' ');
+
+                    const weekDiv = document.createElement('div');
+                    weekDiv.className = `week-card ${isCurrent ? 'current-week' : ''}`;
+                    weekDiv.innerHTML = `
+                        <div class="week-header">
+                            <input type="checkbox" ${Store.selectedWeeks.has(weekKey) ? 'checked' : ''} onchange="UI.toggleWeek('${weekKey}', this.checked)">
+                            <span>Week ${idx + 1}: ${Utils.getShortDate(weekStart)} - ${Utils.getShortDate(weekEnd)}</span>
+                            ${isCurrent ? '<span class="badge badge-current">Current Week</span>' : ''}
+                            ${infoBadges}
+                        </div>`;
+
+                    const grid = document.createElement('div');
+                    grid.className = 'events-grid';
+
+                    events.forEach(ev => {
+                        const isClosed = !!ev.closure;
+                        const isUnderstaffed = !isClosed && (ev.assigned.length < ev.minPeople);
+                        const card = document.createElement('div');
+                        card.className = `event-card ${isClosed ? 'closed-event' : ''} ${isUnderstaffed ? 'understaffed' : ''} ${!isClosed && ev.type === 'SPECIAL' ? 'special-event' : ''}`;
+
+                        if (!isClosed) card.onclick = () => UI.openEventModal(weekKey, ev);
+
+                        const names = ev.assigned
+                            .map(id => Store.cache.peopleMap.get(id)?.name)
+                            .filter(Boolean).sort().join(', ');
+
+                        let awayTeamMembersHtml = '';
+                        if (!isClosed && ev.teamId) {
+                            const awayMembers = Store.data.people
+                                .filter(p => p.teamIds?.includes(ev.teamId) && !CoreLogic.isPersonAvailable(p, ev.dateStr))
+                                .map(p => p.name)
+                                .sort();
+
+                            if (awayMembers.length > 0) {
+                                awayTeamMembersHtml = `<div class="event-away"><strong>Away:</strong> ${awayMembers.join(', ')}</div>`;
+                            }
+                        }
+
+                        // Traffic Light Status Dot Logic
+                        let dotColorClass = '';
+                        if (!isClosed) {
+                            const count = ev.assigned.length;
+                            if (count < ev.minPeople) {
+                                dotColorClass = 'red';
+                            } else if (count > ev.maxPeople) {
+                                dotColorClass = 'orange';
+                            } else {
+                                dotColorClass = 'green';
+                            }
+                        }
+
+                        const statusDotHtml = !isClosed ? `<span class="status-dot ${dotColorClass}"></span>` : '';
+
+                        card.innerHTML = `
+                            <div class="event-title">
+                                <span>${ev.title} ${isClosed ? '<span class="badge badge-closed">CLOSED</span>' : (ev.type === 'SPECIAL' ? '<span class="badge badge-special">SPECIAL</span>' : '')}</span>
+                                ${statusDotHtml}
+                            </div>
+                            <div class="event-meta">${ev.actualDate.toLocaleDateString('en-NZ', { weekday: 'short' })} ${Utils.getShortDate(ev.actualDate)} | ${ev.time} | Min: ${ev.minPeople} | Max: ${ev.maxPeople}</div>
+                            <div class="event-roster">${isClosed ? `🔒 <strong>CLOSED: ${ev.closure.name}</strong><br><em>No staff scheduled</em>` : `<strong>Roster:</strong> ${names || '<em>None</em>'}`}</div>
+                            ${awayTeamMembersHtml}
+                        `;
+                        grid.appendChild(card);
+                    });
+                    weekDiv.appendChild(grid);
+                    container.appendChild(weekDiv);
+                });
+            },
+
+            toggleWeek(weekKey, checked) {
+                checked ? Store.selectedWeeks.add(weekKey) : Store.selectedWeeks.delete(weekKey);
+            },
+
+            togglePanel(id) {
+                if (Store.activePanelId === id) {
+                    this.closePanel(id);
+                } else {
+                    this.openPanel(id);
+                }
+            },
+
+            openPanel(id) {
+                if (Store.activePanelId && Store.activePanelId !== id) {
+                    this.closePanel(Store.activePanelId);
+                }
+                const panel = document.getElementById(id);
+                const overlay = document.getElementById('panelOverlay');
+                overlay.style.display = 'block';
+                panel.style.display = 'flex';
+                
+                void panel.offsetWidth;
+
+                overlay.classList.add('open');
+                panel.classList.add('open');
+                Store.activePanelId = id;
+
+                if (id === 'manageTeamsModal') TeamsManager.populate();
+                if (id === 'managePeopleModal') PeopleManager.populate();
+                if (id === 'manageEventsModal') EventsManager.populate();
+                if (id === 'manageClosedDatesModal') ClosuresManager.populate();
+            },
+
+            closePanel(id) {
+                const panel = document.getElementById(id);
+                const overlay = document.getElementById('panelOverlay');
+                
+                panel.classList.remove('open');
+                overlay.classList.remove('open');
+                
+                if (Store.activePanelId === id) {
+                    Store.activePanelId = null;
+                }
+
+                setTimeout(() => {
+                    if (!panel.classList.contains('open')) {
+                        panel.style.display = 'none';
+                    }
+                    if (!Store.activePanelId) {
+                        overlay.style.display = 'none';
+                    }
+                }, 250);
+            },
+
+            closeAllPanels() {
+                if (Store.activePanelId) {
+                    this.closePanel(Store.activePanelId);
+                }
+            },
+
+            openModal(id) {
+                document.getElementById(id).style.display = 'flex';
+            },
+
+            closeModal(id) { document.getElementById(id).style.display = 'none'; },
+
+            showDataErrors(errors) {
+                document.getElementById('dataErrorLog').innerHTML = errors.map(e => `• ${e}`).join('<br>');
+                this.openModal('dataErrorModal');
+            },
+
+            openEventModal(weekKey, ev) {
+                document.getElementById('modalTitle').innerText = ev.title;
+                document.getElementById('modalMeta').innerText = `Date: ${ev.dateStr} | Time: ${ev.time} | Capacity: ${ev.minPeople}-${ev.maxPeople}`;
+                
+                const rostered = document.getElementById('rosteredList'), available = document.getElementById('availableList'), unavailable = document.getElementById('unavailableList');
+                rostered.innerHTML = ''; available.innerHTML = ''; unavailable.innerHTML = '';
+
+                let cRostered = 0, cUnavail = 0, cAvail = 0;
+                [...Store.data.people].sort((a, b) => a.name.localeCompare(b.name)).forEach(p => {
+                    const li = document.createElement('li');
+                    const reason = CoreLogic.getPersonUnavailabilityReason(p, ev.dateStr);
+
+                    if (reason !== null) {
+                        cUnavail++;
+                        li.innerHTML = `<span>${p.name}</span> <span class="status-away">(${reason})</span>`;
+                        unavailable.appendChild(li);
+                    } else if (ev.assigned.includes(p.id)) {
+                        cRostered++;
+                        li.innerText = p.name;
+                        const btn = document.createElement('button'); btn.innerText = 'Remove'; btn.className = 'danger btn-sm';
+                        btn.onclick = () => {
+                            Store.data.rosters[weekKey][ev.id] = ev.assigned.filter(id => id !== p.id);
+                            Store.autoSave(); UI.renderRoster();
+                            UI.openEventModal(weekKey, { ...ev, assigned: Store.data.rosters[weekKey][ev.id] });
+                        };
+                        li.appendChild(btn); rostered.appendChild(li);
+                    } else {
+                        cAvail++;
+                        const matchesTeam = !ev.teamId || p.teamIds?.includes(ev.teamId);
+                        li.innerText = p.name;
+                        const btn = document.createElement('button'); btn.innerText = matchesTeam ? 'Add' : 'Add (Out of Team)'; btn.className = matchesTeam ? 'btn-sm' : 'warning btn-sm';
+                        btn.onclick = () => {
+                            if (!Store.data.rosters[weekKey][ev.id]) Store.data.rosters[weekKey][ev.id] = [];
+                            Store.data.rosters[weekKey][ev.id].push(p.id);
+                            Store.autoSave(); UI.renderRoster();
+                            UI.openEventModal(weekKey, { ...ev, assigned: Store.data.rosters[weekKey][ev.id] });
+                        };
+                        li.appendChild(btn); available.appendChild(li);
+                    }
+                });
+
+                document.getElementById('rosteredListHeading').innerText = `Currently Rostered (${cRostered})`;
+                document.getElementById('unavailableListHeading').innerText = `Unavailable (${cUnavail})`;
+                document.getElementById('availableListHeading').innerText = `Available Staff (${cAvail})`;
+                this.openModal('eventModal');
+            }
+        };
+
+        const TeamsManager = {
+            populate() {
+                this.resetForm();
+                const container = document.getElementById('teamPeopleCheckboxes');
+                const sortedPeople = [...Store.data.people].sort((a, b) => a.name.localeCompare(b.name));
+                container.innerHTML = sortedPeople.map(p => `<label><input type="checkbox" value="${p.id}" class="team-person-cb"> ${p.name}</label>`).join('') || '<em>No staff found.</em>';
+
+                const sortedTeams = [...Store.data.teams].sort((a, b) => a.name.localeCompare(b.name));
+                const list = document.getElementById('teamsList');
+                list.innerHTML = sortedTeams.map(t => {
+                    const members = Store.data.people.filter(p => p.teamIds?.includes(t.id)).map(p => p.name).sort().join(', ') || 'None';
+                    return `<li><span><strong>${t.name}</strong><br><small style="color:#6b7280;">Members: ${members}</small></span>
+                    <div class="actions-cell">
+                        <button class="warning btn-sm" onclick="TeamsManager.edit(${t.id})">Edit</button>
+                        <button class="danger btn-sm" onclick="TeamsManager.delete(${t.id})">Delete</button>
+                    </div></li>`;
+                }).join('');
+                document.getElementById('teamsListHeading').innerText = `Existing Teams (${Store.data.teams.length})`;
+            },
+            save(e) {
+                e.preventDefault();
+                const id = document.getElementById('editTeamId').value;
+                const name = document.getElementById('teamNameInput').value.trim();
+                const selectedPeople = Array.from(document.querySelectorAll('.team-person-cb:checked')).map(cb => parseInt(cb.value));
+                
+                let targetId = id ? parseInt(id) : Date.now();
+                if (id) {
+                    const team = Store.cache.teamsMap.get(targetId);
+                    if (team) team.name = name;
+                } else {
+                    Store.data.teams.push({ id: targetId, name });
+                }
+
+                Store.data.people.forEach(p => {
+                    const has = p.teamIds.includes(targetId), selected = selectedPeople.includes(p.id);
+                    if (selected && !has) { p.teamIds.push(targetId); CoreLogic.syncTeamMembersToRosters(targetId, p.id); }
+                    else if (!selected && has) p.teamIds = p.teamIds.filter(t => t !== targetId);
+                });
+
+                Store.rebuildCaches(); Store.autoSave(); UI.renderRoster(); this.populate();
+            },
+            edit(id) {
+                const team = Store.cache.teamsMap.get(id); if (!team) return;
+                document.getElementById('editTeamId').value = team.id;
+                document.getElementById('teamNameInput').value = team.name;
+                document.querySelectorAll('.team-person-cb').forEach(cb => {
+                    cb.checked = Store.cache.peopleMap.get(parseInt(cb.value))?.teamIds.includes(team.id);
+                });
+                document.getElementById('teamFormTitle').innerText = 'Edit Team';
+            },
+            delete(id) {
+                if (confirm("Delete team?")) {
+                    Store.data.teams = Store.data.teams.filter(t => t.id !== id);
+                    Store.data.people.forEach(p => p.teamIds = p.teamIds.filter(t => t !== id));
+                    Store.data.events.forEach(ev => { if (ev.teamId === id) ev.teamId = ""; });
+                    Store.rebuildCaches(); CoreLogic.recalculateRosters(); this.populate();
+                }
+            },
+            resetForm() {
+                document.getElementById('editTeamId').value = '';
+                document.getElementById('teamNameInput').value = '';
+                document.querySelectorAll('.team-person-cb').forEach(cb => cb.checked = false);
+                document.getElementById('teamFormTitle').innerText = 'Add New Team';
+            }
+        };
+
+        const PeopleManager = {
+            populate() {
+                this.resetForm();
+                const sortedTeams = [...Store.data.teams].sort((a, b) => a.name.localeCompare(b.name));
+                document.getElementById('personTeamCheckboxes').innerHTML = sortedTeams.map(t => `<label><input type="checkbox" value="${t.id}" class="person-team-cb"> ${t.name}</label>`).join('') || '<em>No teams.</em>';
+                
+                const sortedPeople = [...Store.data.people].sort((a, b) => a.name.localeCompare(b.name));
+                document.getElementById('peopleList').innerHTML = sortedPeople.map(p => {
+                    const emailInfo = p.email ? `<br><small style="color:#4b5563;">✉️ ${p.email}</small>` : '';
+                    const awayInfo = p.awayDate ? `<br><small style="color:#ef4444;">Away: ${Utils.formatReadableDate(p.awayDate)}</small>` : '';
+                    const holInfo = p.holidayDetails ? `<br><small style="color:#d97706;">Holiday Note: ${p.holidayDetails}</small>` : '';
+                    return `
+                    <li><span><strong>${p.name}</strong>${emailInfo}<br><small style="color:#6b7280;">Teams: ${p.teamIds.map(tId => Store.cache.teamsMap.get(tId)?.name).filter(Boolean).sort().join(', ') || 'None'}</small>${awayInfo}${holInfo}</span>
+                    <div class="actions-cell">
+                        <button class="warning btn-sm" onclick="PeopleManager.edit(${p.id})">Edit</button>
+                        <button class="danger btn-sm" onclick="PeopleManager.promptDelete(${p.id})">Delete</button>
+                    </div></li>`;
+                }).join('');
+                document.getElementById('peopleListHeading').innerText = `Current Staff (${Store.data.people.length})`;
+            },
+            
+            updateAwayDateDropdown(person) {
+                const select = document.getElementById('personAwayDateSelect');
+                select.innerHTML = '<option value="">-- No Away Date Selected --</option>';
+                if (!person) return;
+
+                const dates = CoreLogic.getUpcomingRosteredDatesForPerson(person);
+                dates.forEach(dStr => {
+                    const option = document.createElement('option');
+                    option.value = dStr;
+                    option.innerText = Utils.formatReadableDate(dStr) + ` (${dStr})`;
+                    if (person.awayDate === dStr) option.selected = true;
+                    select.appendChild(option);
+                });
+            },
+
+            save(e) {
+                e.preventDefault();
+                const id = document.getElementById('editPersonId').value;
+                const name = document.getElementById('personNameInput').value.trim();
+                const email = document.getElementById('personEmailInput').value.trim();
+                const activeFrom = document.getElementById('personActiveFrom').value;
+                const activeUntil = document.getElementById('personActiveUntil').value;
+                const hStart = document.getElementById('personHolidayStart').value;
+                const hEnd = document.getElementById('personHolidayEnd').value;
+                const holidayDetails = document.getElementById('personHolidayDetails').value.trim();
+                const awayDate = document.getElementById('personAwayDateSelect').value;
+                const teamIds = Array.from(document.querySelectorAll('.person-team-cb:checked')).map(cb => parseInt(cb.value));
+                const holidays = (hStart && hEnd) ? [{ start: hStart, end: hEnd }] : [];
+
+                let targetId = id ? parseInt(id) : Date.now();
+                let savedPerson;
+                if (id) {
+                    savedPerson = Store.cache.peopleMap.get(targetId);
+                    if (savedPerson) Object.assign(savedPerson, { name, email, teamIds, activeFrom, activeUntil, holidays, holidayDetails, awayDate });
+                } else {
+                    savedPerson = { id: targetId, name, email, teamIds, activeFrom, activeUntil, holidays, holidayDetails, awayDate };
+                    Store.data.people.push(savedPerson);
+                }
+
+                Store.rebuildCaches();
+
+                Utils.getNext10Weeks().forEach(weekStart => {
+                    const weekKey = Utils.formatDate(weekStart);
+                    if (Store.data.rosters[weekKey]) {
+                        Store.data.events.forEach(ev => {
+                            for (let i = 0; i < 7; i++) {
+                                const eventDate = new Date(weekStart);
+                                eventDate.setDate(eventDate.getDate() + i);
+                                const dateStr = Utils.formatDate(eventDate);
+                                if (!CoreLogic.isPersonAvailable(savedPerson, dateStr)) {
+                                    if (Store.data.rosters[weekKey][ev.id]) {
+                                        Store.data.rosters[weekKey][ev.id] = Store.data.rosters[weekKey][ev.id].filter(pId => pId !== targetId);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                });
+
+                teamIds.forEach(tId => CoreLogic.syncTeamMembersToRosters(tId, targetId));
+                Store.autoSave(); UI.renderRoster(); this.populate();
+            },
+
+            edit(id) {
+                const p = Store.cache.peopleMap.get(id); if (!p) return;
+                document.getElementById('editPersonId').value = p.id;
+                document.getElementById('personNameInput').value = p.name;
+                document.getElementById('personEmailInput').value = p.email || '';
+                document.getElementById('personActiveFrom').value = p.activeFrom || '';
+                document.getElementById('personActiveUntil').value = p.activeUntil || '';
+                document.getElementById('personHolidayStart').value = p.holidays?.[0]?.start || '';
+                document.getElementById('personHolidayEnd').value = p.holidays?.[0]?.end || '';
+                document.getElementById('personHolidayDetails').value = p.holidayDetails || '';
+                
+                document.querySelectorAll('.person-team-cb').forEach(cb => cb.checked = p.teamIds.includes(parseInt(cb.value)));
+                this.updateAwayDateDropdown(p);
+                document.getElementById('personFormTitle').innerText = 'Edit Person';
+            },
+
+            promptDelete(id) {
+                const p = Store.cache.peopleMap.get(id); if (!p) return;
+                let rosterCount = 0;
+                Object.values(Store.data.rosters).forEach(w => Object.values(w).forEach(arr => { if (arr.includes(id)) rosterCount++; }));
+                document.getElementById('deletePersonName').innerText = p.name;
+                document.getElementById('deletePersonTeamsCount').innerText = p.teamIds.length;
+                document.getElementById('deletePersonRostersCount').innerText = rosterCount;
+                document.getElementById('confirmDeleteBtn').onclick = () => {
+                    Store.data.people = Store.data.people.filter(item => item.id !== id);
+                    Object.keys(Store.data.rosters).forEach(w => Object.keys(Store.data.rosters[w]).forEach(eKey => {
+                        Store.data.rosters[w][eKey] = Store.data.rosters[w][eKey].filter(pId => pId !== id);
+                    }));
+                    UI.closeModal('confirmDeleteModal'); Store.rebuildCaches(); Store.autoSave(); UI.renderRoster(); this.populate();
+                };
+                UI.openModal('confirmDeleteModal');
+            },
+
+            resetForm() {
+                document.getElementById('editPersonId').value = '';
+                document.getElementById('personNameInput').value = '';
+                document.getElementById('personEmailInput').value = '';
+                document.getElementById('personActiveFrom').value = '';
+                document.getElementById('personActiveUntil').value = '';
+                document.getElementById('personHolidayStart').value = '';
+                document.getElementById('personHolidayEnd').value = '';
+                document.getElementById('personHolidayDetails').value = '';
+                document.querySelectorAll('.person-team-cb').forEach(cb => cb.checked = false);
+                this.updateAwayDateDropdown(null);
+                document.getElementById('personFormTitle').innerText = 'Add New Person';
+            }
+        };
+
+        const EventsManager = {
+            populate() {
+                this.resetForm();
+                const sortedTeams = [...Store.data.teams].sort((a, b) => a.name.localeCompare(b.name));
+                document.getElementById('eventTeamSelect').innerHTML = '<option value="">-- Any Available Staff --</option>' + 
+                    sortedTeams.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
+                const sortedEvents = [...Store.data.events].sort((a, b) => a.title.localeCompare(b.title));
+                document.getElementById('eventsList').innerHTML = sortedEvents.map(ev => `
+                    <li><span><strong>${ev.title}</strong> ${ev.type === 'SPECIAL' ? '<span class="badge badge-special">SPECIAL</span>' : ''}<br>
+                    <small style="color:#6b7280;">📍 ${ev.location} | Cap: ${ev.minPeople}-${ev.maxPeople} | Team: ${Store.cache.teamsMap.get(ev.teamId)?.name || 'Unassigned'}</small></span>
+                    <div class="actions-cell">
+                        <button class="warning btn-sm" onclick="EventsManager.edit(${ev.id})">Edit</button>
+                        <button class="danger btn-sm" onclick="EventsManager.delete(${ev.id})">Delete</button>
+                    </div></li>`).join('');
+                document.getElementById('eventsListHeading').innerText = `Current Events (${Store.data.events.length})`;
+            },
+            toggleTypeFields() {
+                const isSpecial = document.getElementById('eventTypeSelect').value === 'SPECIAL';
+                document.getElementById('specialEventGroup').style.display = isSpecial ? 'block' : 'none';
+                document.getElementById('regularEventGroup').style.display = isSpecial ? 'none' : 'block';
+            },
+            toggleRecurrenceFields() {
+                const isNth = document.getElementById('eventRecurrenceType').value === 'MONTHLY_NTH';
+                document.getElementById('weeklyOptions').style.display = isNth ? 'none' : 'flex';
+                document.getElementById('monthlyOptions').style.display = isNth ? 'flex' : 'none';
+            },
+            save(e) {
+                e.preventDefault();
+                const id = document.getElementById('editEventId').value;
+                const type = document.getElementById('eventTypeSelect').value;
+                const title = document.getElementById('eventTitleInput').value.trim();
+                const location = document.getElementById('eventLocationInput').value.trim();
+                const teamId = parseInt(document.getElementById('eventTeamSelect').value) || "";
+                const minPeople = parseInt(document.getElementById('eventMinInput').value);
+                const maxPeople = parseInt(document.getElementById('eventMaxInput').value);
+                const time = document.getElementById('eventTimeInput').value;
+
+                if (minPeople > maxPeople) return alert("Min staff cannot exceed Max staff.");
+
+                const payload = { type, title, location, teamId, minPeople, maxPeople, time };
+                if (type === 'SPECIAL') {
+                    payload.specialDate = document.getElementById('eventSpecialDate').value;
+                } else {
+                    payload.recurrenceType = document.getElementById('eventRecurrenceType').value;
+                    payload.startDate = document.getElementById('eventStartDate').value;
+                    payload.endDate = document.getElementById('eventEndDate').value;
+                    if (payload.recurrenceType === 'MONTHLY_NTH') {
+                        payload.nthOrder = parseInt(document.getElementById('eventNthOrder').value);
+                        payload.nthDayOfWeek = parseInt(document.getElementById('eventNthDaySelect').value);
+                    } else {
+                        payload.interval = parseInt(document.getElementById('eventWeekInterval').value) || 1;
+                        payload.dayOfWeek = parseInt(document.getElementById('eventDaySelect').value);
+                    }
+                }
+
+                if (id) {
+                    const ev = Store.cache.eventsMap.get(parseInt(id));
+                    if (ev) Object.assign(ev, payload);
+                } else {
+                    Store.data.events.push({ id: Date.now(), ...payload });
+                }
+
+                if (teamId) CoreLogic.syncTeamMembersToRosters(teamId);
+                Store.rebuildCaches(); Store.autoSave(); UI.renderRoster(); this.populate();
+            },
+            edit(id) {
+                const ev = Store.cache.eventsMap.get(id); if (!ev) return;
+                document.getElementById('editEventId').value = ev.id;
+                document.getElementById('eventTypeSelect').value = ev.type || 'REGULAR';
+                this.toggleTypeFields();
+                document.getElementById('eventTitleInput').value = ev.title;
+                document.getElementById('eventLocationInput').value = ev.location;
+                document.getElementById('eventTeamSelect').value = ev.teamId || '';
+                document.getElementById('eventMinInput').value = ev.minPeople;
+                document.getElementById('eventMaxInput').value = ev.maxPeople;
+                document.getElementById('eventTimeInput').value = ev.time;
+
+                if (ev.type === 'SPECIAL') {
+                    document.getElementById('eventSpecialDate').value = ev.specialDate || '';
+                } else {
+                    document.getElementById('eventRecurrenceType').value = ev.recurrenceType || 'WEEKLY';
+                    this.toggleRecurrenceFields();
+                    document.getElementById('eventStartDate').value = ev.startDate || '';
+                    document.getElementById('eventEndDate').value = ev.endDate || '';
+                    if (ev.recurrenceType === 'MONTHLY_NTH') {
+                        document.getElementById('eventNthOrder').value = ev.nthOrder || 1;
+                        document.getElementById('eventNthDaySelect').value = ev.nthDayOfWeek || 1;
+                    } else {
+                        document.getElementById('eventWeekInterval').value = ev.interval || 1;
+                        document.getElementById('eventDaySelect').value = ev.dayOfWeek || 1;
+                    }
+                }
+                document.getElementById('eventFormTitle').innerText = 'Edit Event';
+            },
+            delete(id) {
+                if (confirm("Delete event?")) {
+                    Store.data.events = Store.data.events.filter(e => e.id !== id);
+                    Store.rebuildCaches(); CoreLogic.recalculateRosters(); this.populate();
+                }
+            },
+            resetForm() {
+                document.getElementById('editEventId').value = '';
+                document.getElementById('eventTypeSelect').value = 'REGULAR';
+                this.toggleTypeFields();
+                document.getElementById('eventTitleInput').value = '';
+                document.getElementById('eventLocationInput').value = '';
+                document.getElementById('eventTeamSelect').value = '';
+                document.getElementById('eventMinInput').value = '1';
+                document.getElementById('eventMaxInput').value = '2';
+                document.getElementById('eventTimeInput').value = '';
+                document.getElementById('eventFormTitle').innerText = 'Add New Event';
+            }
+        };
+
+        const ClosuresManager = {
+            populate() {
+                this.resetForm();
+                const sortedEvents = [...Store.data.events].sort((a, b) => a.title.localeCompare(b.title));
+                document.getElementById('closureTargetSelect').innerHTML = '<option value="ALL">All Events (Entire Hub Closed)</option>' +
+                    sortedEvents.map(ev => `<option value="${ev.id}">Only Event: ${ev.title}</option>`).join('');
+
+                const sortedClosures = [...Store.data.closures].sort((a, b) => a.name.localeCompare(b.name));
+                document.getElementById('closuresList').innerHTML = sortedClosures.map(c => `
+                    <li><span><strong>${c.name}</strong> ${c.type === 'INFO' ? '<span class="badge badge-info">INFO</span>' : '<span class="badge badge-closed">CLOSURE</span>'}<br>
+                    <small style="color:#6b7280;">📅 Range: ${Utils.formatReadableDate(c.startDate)} to ${Utils.formatReadableDate(c.endDate || c.startDate)} ${c.type !== 'INFO' ? '| Scope: ' + (c.target === 'ALL' ? 'All Events' : (Store.cache.eventsMap.get(c.target)?.title || 'Single Event')) : ''}</small></span>
+                    <div class="actions-cell">
+                        <button class="warning btn-sm" onclick="ClosuresManager.edit(${c.id})">Edit</button>
+                        <button class="danger btn-sm" onclick="ClosuresManager.delete(${c.id})">Delete</button>
+                    </div></li>`).join('');
+                document.getElementById('closuresListHeading').innerText = `Configured Entries (${Store.data.closures.length})`;
+            },
+            toggleTypeFields() {
+                const isInfo = document.getElementById('closureTypeSelect').value === 'INFO';
+                document.getElementById('closureTargetGroup').style.display = isInfo ? 'none' : 'block';
+            },
+            save(e) {
+                e.preventDefault();
+                const id = document.getElementById('editClosureId').value;
+                const type = document.getElementById('closureTypeSelect').value;
+                const name = document.getElementById('closureNameInput').value.trim();
+                const startDate = document.getElementById('closureStartDate').value;
+                let endDate = document.getElementById('closureEndDate').value || startDate;
+                const target = document.getElementById('closureTargetSelect').value;
+
+                if (startDate > endDate) return alert("Start date cannot be after End date.");
+
+                const payload = { type, name, startDate, endDate, target: type === 'INFO' ? 'NONE' : (target === "ALL" ? "ALL" : parseInt(target)) };
+                if (id) {
+                    const c = Store.cache.closuresMap.get(parseInt(id));
+                    if (c) Object.assign(c, payload);
+                } else {
+                    Store.data.closures.push({ id: Date.now(), ...payload });
+                }
+
+                Store.rebuildCaches(); 
+                CoreLogic.recalculateRosters(); 
+                this.populate();
+            },
+            edit(id) {
+                const c = Store.cache.closuresMap.get(id); if (!c) return;
+                document.getElementById('editClosureId').value = c.id;
+                document.getElementById('closureTypeSelect').value = c.type || 'CLOSURE';
+                this.toggleTypeFields();
+                document.getElementById('closureNameInput').value = c.name;
+                document.getElementById('closureStartDate').value = c.startDate;
+                document.getElementById('closureEndDate').value = c.endDate || c.startDate;
+                document.getElementById('closureTargetSelect').value = c.target || "ALL";
+                document.getElementById('closureFormTitle').innerText = 'Edit Calendar Entry';
+            },
+            delete(id) {
+                if (confirm("Remove calendar entry?")) {
+                    Store.data.closures = Store.data.closures.filter(c => c.id !== id);
+                    Store.rebuildCaches(); 
+                    CoreLogic.recalculateRosters(); 
+                    this.populate();
+                }
+            },
+            resetForm() {
+                document.getElementById('editClosureId').value = '';
+                document.getElementById('closureTypeSelect').value = 'CLOSURE';
+                this.toggleTypeFields();
+                document.getElementById('closureNameInput').value = '';
+                document.getElementById('closureStartDate').value = '';
+                document.getElementById('closureEndDate').value = '';
+                document.getElementById('closureTargetSelect').value = 'ALL';
+                document.getElementById('closureFormTitle').innerText = 'Add Calendar Entry';
+            }
+        };
+
+        const ExportManager = {
+            openShareModal() {
+                if (Store.selectedWeeks.size === 0) return alert("Select at least one week first.");
+                const selected = Utils.getNext10Weeks().filter(w => Store.selectedWeeks.has(Utils.formatDate(w))).sort((a,b) => a-b);
+                let out = "";
+
+                selected.forEach((w, idx) => {
+                    const weekStartStr = Utils.formatDate(w);
+                    out += `Roster for week beginning ${Utils.formatReadableDate(weekStartStr)}\n`;
+                    
+                    const infoEvents = CoreLogic.getWeeklyInfoEvents(w);
+                    if (infoEvents.length > 0) {
+                        infoEvents.forEach(ie => {
+                            const dateRange = (ie.endDate && ie.endDate !== ie.startDate) 
+                                ? `${Utils.formatReadableDate(ie.startDate)} - ${Utils.formatReadableDate(ie.endDate)}`
+                                : Utils.formatReadableDate(ie.startDate);
+                            out += `Calendar Event: ${ie.name} (${dateRange})\n`;
+                        });
+                    }
+
+                    CoreLogic.generateWeeklyEvents(w).forEach(ev => {
+                        if (ev.closure) {
+                            out += `${ev.title}: CLOSED (${ev.closure.name})\n`;
+                        } else {
+                            const names = ev.assigned.map(id => Store.cache.peopleMap.get(id)?.name).filter(Boolean).sort().join(', ') || 'None';
+                            out += `${ev.title}: ${names}\n`;
+
+                            if (ev.teamId) {
+                                const awayTeamMembers = Store.data.people
+                                    .filter(p => p.teamIds?.includes(ev.teamId) && !CoreLogic.isPersonAvailable(p, ev.dateStr))
+                                    .map(p => p.name)
+                                    .sort();
+
+                                if (awayTeamMembers.length > 0) {
+                                    out += `(away - ${awayTeamMembers.join(', ')})\n`;
+                                }
+                            }
+                        }
+                    });
+
+                    if (idx < selected.length - 1) out += "\n----------------------------------------\n\n";
+                });
+
+                document.getElementById('shareTextOutput').value = out;
+                UI.openModal('shareModal');
+            },
+            copyShareText() {
+                const text = document.getElementById('shareTextOutput');
+                text.select();
+                navigator.clipboard.writeText(text.value).then(() => alert("Copied!")).catch(() => alert("Copy failed."));
+            },
+            exportCSV() {
+                if (Store.selectedWeeks.size === 0) return alert("Select at least one week first.");
+                let csv = "data:text/csv;charset=utf-8,Week Start,Weekday,Date,Time,Location,Event,Rostered\n";
+                Utils.getNext10Weeks().filter(w => Store.selectedWeeks.has(Utils.formatDate(w))).forEach(w => {
+                    const wKey = Utils.formatDate(w);
+                    CoreLogic.generateWeeklyEvents(w).forEach(ev => {
+                        const names = ev.closure ? `CLOSED (${ev.closure.name})` : (ev.assigned.map(id => Store.cache.peopleMap.get(id)?.name).filter(Boolean).sort().join(' & ') || 'Unassigned');
+                        const wDay = ev.actualDate.toLocaleDateString('en-NZ', { weekday: 'long' });
+                        csv += `"${wKey}","${wDay}","${ev.dateStr}","${ev.time}","${ev.location}","${ev.title}","${names}"\n`;
+                    });
+                });
+                const link = document.createElement("a");
+                link.href = encodeURI(csv);
+                link.download = `RosterMaticExport.csv`;
+                link.click();
+                UI.closeModal('utilitiesModal');
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            Store.data = { teams: [], people: [], events: [], closures: [], rosters: {}, lastSaved: "" };
+            Store.rebuildCaches();
+            UI.renderRoster();
+            FileFS.init();
+        });
+    </script>
+</body>
+</html>
