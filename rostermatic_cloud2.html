@@ -438,7 +438,8 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
+        import { getAnalytics } from "firebase/analytics";
+        
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'roster-matic-app';
 
         // --- FIREBASE CONFIGURATION ---
@@ -446,12 +447,13 @@
         // replace the 'fallbackConfig' object below with the configuration from 
         // your own Firebase project. Follow the "Deployment Guide" instructions.
         const fallbackConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "your-project.firebaseapp.com",
-            projectId: "your-project",
-            storageBucket: "your-project.firebasestorage.app",
-            messagingSenderId: "123456789",
-            appId: "YOUR_APP_ID"
+          apiKey: "AIzaSyBU8WAzQsTcc1QLqC0tSw4EcTHiIIPPhls",
+          authDomain: "rostermaster-d0d54.firebaseapp.com",
+          projectId: "rostermaster-d0d54",
+          storageBucket: "rostermaster-d0d54.firebasestorage.app",
+          messagingSenderId: "441998337898",
+          appId: "1:441998337898:web:5aebc306a718c460596713",
+          measurementId: "G-91LKRTD80D"
         };
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : fallbackConfig;
         // ------------------------------
@@ -459,6 +461,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const analytics = getAnalytics(app);
 
         const DEMO_DATA = {
             teams: [
@@ -466,7 +469,7 @@
                 { id: 102, name: "Evening Operations" }
             ],
             people: [
-                { id: 1, name: "Alex Morgan", email: "alex.morgan@example.com", teamIds: [101], activeFrom: "", activeUntil: "", holidays: [], holidayDetails: "", awayDate: "" },
+                { id: 1, name: "Digi Di", email: "digi.di@example.com", teamIds: [101], activeFrom: "", activeUntil: "", holidays: [], holidayDetails: "", awayDate: "" },
                 { id: 2, name: "Sam Taylor", email: "sam.taylor@example.com", teamIds: [101, 102], activeFrom: "", activeUntil: "", holidays: [], holidayDetails: "", awayDate: "" },
                 { id: 3, name: "Jordan Lee", email: "jordan.lee@example.com", teamIds: [102], activeFrom: "", activeUntil: "", holidays: [], holidayDetails: "", awayDate: "" }
             ],
