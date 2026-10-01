@@ -446,15 +446,17 @@
         // To deploy this app on your own hosting (like GitHub Pages), you MUST 
         // replace the 'fallbackConfig' object below with the configuration from 
         // your own Firebase project. Follow the "Deployment Guide" instructions.
-        const fallbackConfig = {
-          apiKey: "AIzaSyBU8WAzQsTcc1QLqC0tSw4EcTHiIIPPhls",
-          authDomain: "rostermaster-d0d54.firebaseapp.com",
-          projectId: "rostermaster-d0d54",
-          storageBucket: "rostermaster-d0d54.firebasestorage.app",
-          messagingSenderId: "441998337898",
-          appId: "1:441998337898:web:5aebc306a718c460596713",
-          measurementId: "G-91LKRTD80D"
-        };
+
+        const firebaseConfig = {
+  apiKey: "AIzaSyBU8WAzQsTcc1QLqC0tSw4EcTHiIIPPhls",
+  authDomain: "rostermaster-d0d54.firebaseapp.com",
+  projectId: "rostermaster-d0d54",
+  storageBucket: "rostermaster-d0d54.firebasestorage.app",
+  messagingSenderId: "441998337898",
+  appId: "1:441998337898:web:5aebc306a718c460596713",
+  measurementId: "G-91LKRTD80D"
+};
+
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : fallbackConfig;
         // ------------------------------
 
