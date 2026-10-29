@@ -157,7 +157,60 @@
             padding-bottom: 8px;
             border-bottom: 2px solid var(--border);
         }
-        .view-header h2 {
+        .view-header h2 {                 const extrasStr = (ev.extras && ev.extras.length > 0) ? ev.extras.map(x => `${x.name}${x.comment ? ' (' + x.comment + ')' : ''}`).join(' & ') : 'None';
+                        const wDay = ev.actualDate.toLocaleDateString('en-NZ', { weekday: 'long' });
+                        csv += `"${wKey}","${wDay}","${ev.dateStr}","${ev.time}","${ev.location}","${ev.title}","${names}","${extrasStr}"\n`;
+                    });
+                });
+                const encodedUri = encodeURI(csv);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `Roster_Export_${Utils.formatDate(new Date())}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        };
+
+        window.UI = UI;
+        window.Store = Store;
+        window.CoreLogic = CoreLogic;
+        window.Utils = Utils;
+        window.TeamsManager = TeamsManager;
+        window.PeopleManager = PeopleManager;
+        window.EventsManager = EventsManager;
+        window.ClosuresManager = ClosuresManager;
+        window.ExportManager = ExportManager;
+        window.Utilities = Utilities;
+        window.Simulation = Simulation;
+        window.Dialog = Dialog;
+
+        window.addEventListener('resize', () => {
+            if (Store.activeViewId === 'rosterView') {
+                UI.renderRoster();
+            }
+        });
+
+        async function initFirebase() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                CloudSync.init();
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                document.getElementById('syncBadge').className = 'sync-badge error';
+                document.getElementById('syncBadge').innerText = 'Auth Error';
+                Dialog.alert("Could not connect to the real-time server.", "Connection Error");
+            }
+        }
+
+        initFirebase();
+    </script>
+</body>
+</html>
             margin: 0;
             font-size: 1.25rem;
             color: var(--text);
@@ -1144,8 +1197,8 @@
     </div>
 
     <script type="module">
-            import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-            import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+            import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+            import { getAuth, signInWithPopup, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
             const firebaseConfig = {
               apiKey: "AIzaSyBU8WAzQsTcc1QLqC0tSw4EcTHiIIPPhls",
