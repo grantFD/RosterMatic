@@ -1,0 +1,2743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RosterMatic</title>
+    <style>
+        :root {
+            --bg: #f4f5f9;
+            --surface: #ffffff;
+            --current-week-bg: #eef2ff;
+            --current-week-border: #6366f1;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --success: #059669;
+            --success-hover: #047857;
+            --warning: #d97706;
+            --warning-hover: #b45309;
+            --danger: #dc2626;
+            --closed: #4b5563;
+            --closed-bg: #f3f4f6;
+            --closed-border: #9ca3af;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --nav-height: 60px;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            padding-bottom: 30px;
+        }
+
+        /* Top Sticky Navbar Toolbar */
+        .toolbar-sticky-wrapper {
+            position: sticky;
+            top: 0;
+            z-index: 500;
+            background: var(--surface);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .top-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: #1e293b;
+            color: #fff;
+        }
+
+        .top-banner h1 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sync-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: var(--success);
+            color: white;
+        }
+        .sync-badge.error { background: var(--danger); }
+        .sync-badge.offline { background: var(--warning); }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        /* Responsive Buttons & Navigation */
+        .nav-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 8px;
+            background: #f1f5f9;
+            color: #334155;
+            font-weight: 600;
+            font-size: 0.88rem;
+            cursor: pointer;
+            min-height: 40px;
+            touch-action: manipulation;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .nav-btn:hover, .nav-btn:active {
+            background: #e2e8f0;
+        }
+
+        .nav-btn.primary-nav {
+            background: var(--primary);
+            color: #ffffff;
+        }
+        .nav-btn.primary-nav:hover { background: var(--primary-hover); }
+
+        .nav-btn.active {
+            background: #312e81;
+            color: #ffffff;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .nav-btn.warning-btn { background: #fef3c7; color: #92400e; }
+        .nav-btn.warning-btn:hover { background: #fde68a; }
+
+        .nav-btn.dark-btn { background: #334155; color: #fff; }
+
+        /* App View Wrapper */
+        .main-content {
+            padding: 12px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Screen Views */
+        .app-view {
+            display: none;
+        }
+        .app-view.active-view {
+            display: block;
+        }
+
+        /* View Section Headers */
+        .view-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--border);
+        }
+        .view-header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: var(--text);
+        }
+
+        /* Roster Layout & Cards */
+        .roster-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .week-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+        }
+        .week-card.current-week {
+            background: var(--current-week-bg);
+            border: 2px solid var(--current-week-border);
+        }
+
+        .week-header {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .week-header input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        /* Mobile View Day Containers */
+        .mobile-day-section {
+            margin-bottom: 14px;
+        }
+        .mobile-day-header {
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 0.95rem;
+            padding: 6px 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .mobile-day-header.header-green {
+            background-color: var(--success);
+        }
+        .mobile-day-header.header-orange {
+            background-color: var(--warning);
+        }
+
+        /* Desktop Column Layout vs Mobile Stack Layout */
+        .week-calendar-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        @media (min-width: 768px) {
+            .mobile-day-header {
+                display: none;
+            }
+            .week-calendar-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 12px;
+                align-items: start;
+            }
+        }
+
+        .day-column {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            height: 100%;
+        }
+
+        .day-column-header {
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 0.85rem;
+            padding: 6px 8px;
+            border-radius: 6px;
+            text-align: center;
+            margin-bottom: 2px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .day-column-header.header-green {
+            background-color: var(--success);
+        }
+        .day-column-header.header-orange {
+            background-color: var(--warning);
+        }
+
+        .event-card {
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #ffffff;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .event-card:hover {
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+        .event-card:active {
+            transform: scale(0.99);
+            background: #f9fafb;
+        }
+
+        .event-card.understaffed {
+            border-left: 5px solid var(--danger);
+            background: #fef2f2;
+        }
+        .event-card.special-event {
+            border-top: 3px solid var(--warning);
+        }
+        .event-card.closed-event {
+            border: 1px dashed var(--closed-border);
+            border-top: 4px solid var(--closed);
+            background: var(--closed-bg);
+            opacity: 0.85;
+            cursor: not-allowed;
+        }
+
+        .event-title {
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .event-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+        .event-roster {
+            font-size: 0.85rem;
+            line-height: 1.35;
+        }
+        .event-extras {
+            font-size: 0.82rem;
+            margin-top: 4px;
+            color: #4f46e5;
+            font-weight: 600;
+        }
+        .event-away {
+            font-size: 0.8rem;
+            margin-top: 6px;
+            color: var(--danger);
+            font-weight: 500;
+        }
+
+        /* Status Indicator Dot */
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-left: 6px;
+        }
+        .status-dot.red { background-color: var(--danger); }
+        .status-dot.orange { background-color: var(--warning); }
+        .status-dot.green { background-color: var(--success); }
+
+        /* Compact Layout Forms */
+        .compact-edit-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        @media (min-width: 850px) {
+            .compact-edit-layout {
+                display: grid;
+                grid-template-columns: 360px 1fr;
+                align-items: start;
+            }
+        }
+
+        .form-card, .list-card {
+            background: var(--surface);
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .form-card h3, .list-card h3 {
+            margin: 0 0 12px 0;
+            font-size: 1.1rem;
+        }
+        .form-card h3 { color: var(--primary); }
+
+        /* Form Control Styling */
+        .form-group {
+            margin-bottom: 12px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #374151;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            background: #fff;
+            min-height: 42px;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+        }
+
+        .form-row {
+            display: flex;
+            gap: 8px;
+        }
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 160px;
+            overflow-y: auto;
+            padding: 8px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .checkbox-group label {
+            font-weight: normal;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            padding: 4px 0;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 14px;
+        }
+        .btn-row button {
+            flex: 1;
+        }
+
+        /* Buttons */
+        button.btn-action {
+            padding: 10px 14px;
+            border: none;
+            border-radius: 8px;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            min-height: 42px;
+            touch-action: manipulation;
+        }
+        button.btn-action.success { background: var(--success); }
+        button.btn-action.danger { background: var(--danger); }
+        button.btn-action.warning { background: var(--warning); color: #fff; }
+        button.btn-action.secondary { background: #6b7280; }
+
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 0.82rem;
+            min-height: 34px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        .btn-sm.warning { background: #f59e0b; color: #fff; }
+        .btn-sm.danger { background: var(--danger); color: #fff; }
+        .btn-sm.secondary { background: #6b7280; color: #fff; }
+        .btn-sm.primary { background: var(--primary); color: #fff; }
+
+        /* Item List Components */
+        .item-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .item-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: #fff;
+            gap: 8px;
+        }
+        .item-info {
+            flex: 1;
+            font-size: 0.9rem;
+        }
+        .actions-cell {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .status-away { color: var(--danger); font-size: 0.8rem; font-weight: 600; }
+        .status-inactive { color: var(--text-muted); font-size: 0.8rem; }
+
+        /* Badges */
+        .badge {
+            font-size: 0.72rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #e5e7eb;
+            margin-left: 4px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .badge-special { background: #feefc3; color: #b45309; }
+        .badge-closed { background: #e5e7eb; color: #374151; border: 1px solid #9ca3af; }
+        .badge-info { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+        .badge-current { background: #dbeafe; color: #1e40af; }
+        .badge-override { background: #fee2e2; color: #991b1b; }
+        .badge-extra { background: #e0e7ff; color: #3730a3; }
+
+        /* Modal Screens & Dialogs */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            justify-content: center;
+            align-items: flex-end;
+            z-index: 1000;
+            padding: 0;
+        }
+
+        @media (min-width: 640px) {
+            .modal-overlay {
+                align-items: center;
+                padding: 16px;
+            }
+        }
+
+        .modal {
+            background: var(--surface);
+            padding: 16px;
+            border-radius: 16px 16px 0 0;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+            animation: slideUp 0.2s cubic-bezier(0, 0, 0.2, 1);
+        }
+
+        @media (min-width: 640px) {
+            .modal {
+                border-radius: 12px;
+                max-width: 650px;
+                animation: fadeIn 0.15s ease-out;
+            }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.96); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.15rem;
+        }
+        .modal-close {
+            cursor: pointer;
+            font-size: 1.6rem;
+            font-weight: bold;
+            line-height: 1;
+            color: var(--text-muted);
+            padding: 4px 8px;
+        }
+
+        /* Direct Edit Person Section */
+        .direct-person-editor {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .direct-person-editor.active {
+            display: block;
+        }
+        .direct-person-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* Extra Manual Add Section */
+        .add-extra-card {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 14px;
+        }
+        .add-extra-card h4 {
+            margin: 0 0 8px 0;
+            color: #166534;
+            font-size: 0.9rem;
+        }
+
+        textarea.share-output {
+            width: 100%;
+            height: 200px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            margin-bottom: 12px;
+            resize: vertical;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .utility-option {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px;
+            background: #f9fafb;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        @media (min-width: 500px) {
+            .utility-option {
+                flex-direction: row;
+                align-items: center;
+            }
+            .utility-option .btn-col { width: 160px; flex-shrink: 0; }
+        }
+
+        .sim-bar-inline {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .sim-bar-inline .controls {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 6px;
+        }
+
+        .status-banner {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #374151;
+            background: #e0e7ff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="toolbar-sticky-wrapper">
+        <div class="top-banner">
+            <h1>📅 RosterMatic</h1>
+            <div style="display:flex; align-items:center; gap: 8px;">
+                <button class="btn-sm primary" id="authBtn" onclick="AuthManager.handleAuthAction()">Sign In</button>
+                <span id="syncBadge" class="sync-badge offline">Connecting...</span>
+                <small id="lastSavedDisplay" style="font-size: 0.75rem; opacity: 0.85;">Updated: Never</small>
+            </div>
+        </div>
+
+        <div class="toolbar" id="mainToolbar">
+            <button class="nav-btn primary-nav active" id="btnNavRoster" onclick="UI.showView('rosterView')">
+                <span>📋 Roster</span>
+            </button>
+            <button class="nav-btn" id="btnNavTeams" onclick="UI.showView('teamsView')">
+                <span>👥 Teams</span>
+            </button>
+            <button class="nav-btn" id="btnNavPeople" onclick="UI.showView('peopleView')">
+                <span>👤 People</span>
+            </button>
+            <button class="nav-btn" id="btnNavEvents" onclick="UI.showView('eventsView')">
+                <span>🗓️ Events</span>
+            </button>
+            <button class="nav-btn" id="btnNavCalendar" onclick="UI.showView('calendarView')">
+                <span>📆 Calendar</span>
+            </button>
+            <button class="nav-btn dark-btn" onclick="UI.openModal('utilitiesModal')">
+                <span>🛠️ Utilities</span>
+            </button>
+            <button class="nav-btn warning-btn" onclick="ExportManager.openShareModal()">
+                <span>📤 Share</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div id="statusBanner" class="status-banner"></div>
+
+        <!-- VIEW 1: Main Roster View -->
+        <div class="app-view active-view" id="rosterView">
+            <div class="roster-container" id="rosterContainer"></div>
+        </div>
+
+        <!-- VIEW 2: Teams View -->
+        <div class="app-view" id="teamsView">
+            <div class="view-header">
+                <h2>Manage Teams</h2>
+                <button class="btn-sm secondary" onclick="UI.showView('rosterView')">Back to Roster</button>
+            </div>
+            <div class="compact-edit-layout">
+                <div class="form-card">
+                    <h3 id="teamFormTitle">Add New Team</h3>
+                    <form onsubmit="TeamsManager.save(event)">
+                        <input type="hidden" id="editTeamId">
+                        <div class="form-group">
+                            <label>Team Name</label>
+                            <input type="text" id="teamNameInput" required placeholder="e.g. Morning Support">
+                        </div>
+                        <div class="form-group">
+                            <label>Assign Members</label>
+                            <div class="checkbox-group" id="teamPeopleCheckboxes"></div>
+                        </div>
+                        <div class="btn-row">
+                            <button type="submit" class="btn-action success" id="teamSubmitBtn">Save Team</button>
+                            <button type="button" class="btn-action secondary" onclick="TeamsManager.resetForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="list-card">
+                    <h3 id="teamsListHeading">Existing Teams (0)</h3>
+                    <ul id="teamsList" class="item-list"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 3: People View -->
+        <div class="app-view" id="peopleView">
+            <div class="view-header">
+                <h2>Manage People</h2>
+                <button class="btn-sm secondary" onclick="UI.showView('rosterView')">Back to Roster</button>
+            </div>
+            <div class="compact-edit-layout">
+                <div class="form-card">
+                    <h3 id="personFormTitle">Add New Person</h3>
+                    <form onsubmit="PeopleManager.save(event)">
+                        <input type="hidden" id="editPersonId">
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input type="text" id="personNameInput" required placeholder="e.g. Alex Morgan">
+                        </div>
+                        <div class="form-group">
+                            <label>Email Address</label>
+                            <input type="email" id="personEmailInput" placeholder="alex@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Assigned Teams</label>
+                            <div class="checkbox-group" id="personTeamCheckboxes"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Active From</label>
+                                <input type="date" id="personActiveFrom">
+                            </div>
+                            <div class="form-group">
+                                <label>Active Until</label>
+                                <input type="date" id="personActiveUntil">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Away Start</label>
+                                <input type="date" id="personHolidayStart">
+                            </div>
+                            <div class="form-group">
+                                <label>Away End</label>
+                                <input type="date" id="personHolidayEnd">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Away Note / Reason</label>
+                            <input type="text" id="personHolidayDetails" placeholder="Annual leave, overseas trip">
+                        </div>
+                        <div class="form-group">
+                            <label>Away Date (Upcoming Rostered Shift)</label>
+                            <select id="personAwayDateSelect">
+                                <option value="">-- No Away Date Selected --</option>
+                            </select>
+                            <small style="color: #6b7280; display: block; margin-top: 4px;">Choose from upcoming rostered dates.</small>
+                        </div>
+                        <div class="btn-row">
+                            <button type="submit" class="btn-action success" id="personSubmitBtn">Save Person</button>
+                            <button type="button" class="btn-action secondary" onclick="PeopleManager.resetForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="list-card">
+                    <h3 id="peopleListHeading">Current Staff (0)</h3>
+                    <ul id="peopleList" class="item-list"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 4: Events View -->
+        <div class="app-view" id="eventsView">
+            <div class="view-header">
+                <h2>Manage Events</h2>
+                <button class="btn-sm secondary" onclick="UI.showView('rosterView')">Back to Roster</button>
+            </div>
+            <div class="compact-edit-layout">
+                <div class="form-card">
+                    <h3 id="eventFormTitle">Add New Event</h3>
+                    <form onsubmit="EventsManager.save(event)">
+                        <input type="hidden" id="editEventId">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Type</label>
+                                <select id="eventTypeSelect" onchange="EventsManager.toggleTypeFields()" required>
+                                    <option value="REGULAR">Regular (Recurring)</option>
+                                    <option value="SPECIAL">Special (One-off)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Title</label>
+                                <input type="text" id="eventTitleInput" required placeholder="Shift Title">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Location</label>
+                                <input type="text" id="eventLocationInput" required placeholder="Location">
+                            </div>
+                            <div class="form-group">
+                                <label>Team</label>
+                                <select id="eventTeamSelect"></select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Min Staff</label>
+                                <input type="number" id="eventMinInput" required min="0" value="1">
+                            </div>
+                            <div class="form-group">
+                                <label>Max Staff</label>
+                                <input type="number" id="eventMaxInput" required min="1" value="2">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Start Time</label>
+                            <input type="time" id="eventTimeInput" required>
+                        </div>
+
+                        <div id="specialEventGroup" class="form-group" style="display:none;">
+                            <label>Event Date</label>
+                            <input type="date" id="eventSpecialDate">
+                        </div>
+
+                        <div id="regularEventGroup">
+                            <div class="form-group">
+                                <label>Recurrence Pattern</label>
+                                <select id="eventRecurrenceType" onchange="EventsManager.toggleRecurrenceFields()">
+                                    <option value="WEEKLY">Weekly / Multi-Week Interval</option>
+                                    <option value="MONTHLY_NTH">Monthly (Nth Weekday)</option>
+                                </select>
+                            </div>
+                            <div class="form-row" id="weeklyOptions">
+                                <div class="form-group">
+                                    <label>Interval (Weeks)</label>
+                                    <input type="number" id="eventWeekInterval" min="1" value="1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Day of Week</label>
+                                    <select id="eventDaySelect">
+                                        <option value="1">Mon</option><option value="2">Tue</option><option value="3">Wed</option>
+                                        <option value="4">Thu</option><option value="5">Fri</option><option value="6">Sat</option><option value="0">Sun</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row" id="monthlyOptions" style="display:none;">
+                                <div class="form-group">
+                                    <label>Order</label>
+                                    <select id="eventNthOrder">
+                                        <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="5">Last</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Day</label>
+                                    <select id="eventNthDaySelect">
+                                        <option value="1">Mon</option><option value="2">Tue</option><option value="3">Wed</option>
+                                        <option value="4">Thu</option><option value="5">Fri</option><option value="6">Sat</option><option value="0">Sun</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Active From</label><input type="date" id="eventStartDate"></div>
+                                <div class="form-group"><label>Active Until</label><input type="date" id="eventEndDate"></div>
+                            </div>
+                        </div>
+
+                        <div class="btn-row">
+                            <button type="submit" class="btn-action success" id="eventSubmitBtn">Save Event</button>
+                            <button type="button" class="btn-action secondary" onclick="EventsManager.resetForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="list-card">
+                    <h3 id="eventsListHeading">Current Events (0)</h3>
+                    <ul id="eventsList" class="item-list"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 5: Calendar & Closures View -->
+        <div class="app-view" id="calendarView">
+            <div class="view-header">
+                <h2>Calendar & Closed Dates</h2>
+                <button class="btn-sm secondary" onclick="UI.showView('rosterView')">Back to Roster</button>
+            </div>
+            <div class="compact-edit-layout">
+                <div class="form-card">
+                    <h3 id="closureFormTitle">Add Calendar Entry</h3>
+                    <form onsubmit="ClosuresManager.save(event)">
+                        <input type="hidden" id="editClosureId">
+                        <div class="form-group">
+                            <label>Entry Type</label>
+                            <select id="closureTypeSelect" onchange="ClosuresManager.toggleTypeFields()" required>
+                                <option value="CLOSURE">Hub Closure (Blocks Rostering)</option>
+                                <option value="INFO">Informational Event (Header Banner)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Title / Name</label>
+                            <input type="text" id="closureNameInput" required placeholder="e.g. Easter Holiday Closure">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Start Date</label><input type="date" id="closureStartDate" required></div>
+                            <div class="form-group"><label>End Date</label><input type="date" id="closureEndDate"></div>
+                        </div>
+                        <div class="form-group" id="closureTargetGroup">
+                            <label>Apply Closure To</label>
+                            <select id="closureTargetSelect"></select>
+                        </div>
+                        <div class="btn-row">
+                            <button type="submit" class="btn-action success" id="closureSubmitBtn">Save Entry</button>
+                            <button type="button" class="btn-action secondary" onclick="ClosuresManager.resetForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="list-card">
+                    <h3 id="closuresListHeading">Configured Entries (0)</h3>
+                    <ul id="closuresList" class="item-list"></ul>
+                </div>
+            </div>
+        </div>
+
+    </div> <!-- End Main Content -->
+
+    <!-- Event Detail Roster Modal -->
+    <div class="modal-overlay" id="eventModal">
+        <div class="modal">
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border);">
+                <button type="button" class="btn-sm secondary" onclick="UI.closeModal('eventModal')">← Back to Roster</button>
+                <span class="modal-close" onclick="UI.closeModal('eventModal')" style="padding:0; margin:0;">&times;</span>
+            </div>
+
+            <div class="modal-header">
+                <div>
+                    <h2 id="modalTitle">Event Details</h2>
+                    <div id="modalMeta" class="event-meta"></div>
+                </div>
+            </div>
+
+            <div class="direct-person-editor" id="directPersonEditor">
+                <div class="direct-person-header">
+                    <span id="directPersonNameTitle">Edit Away Dates</span>
+                    <button type="button" class="btn-sm secondary" onclick="UI.closeDirectPersonEditor()">Close</button>
+                </div>
+                <input type="hidden" id="directPersonId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Away Start</label>
+                        <input type="date" id="directHolidayStart">
+                    </div>
+                    <div class="form-group">
+                        <label>Away End</label>
+                        <input type="date" id="directHolidayEnd">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Away Details / Note</label>
+                    <input type="text" id="directHolidayDetails" placeholder="e.g. Annual leave">
+                </div>
+                <div class="form-group">
+                    <label>Away Date (Selected Rostered Date)</label>
+                    <select id="directAwayDateSelect"></select>
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="btn-action success" onclick="UI.saveDirectPersonHolidayAway()">Save Dates</button>
+                    <button type="button" class="btn-action danger" onclick="UI.clearDirectPersonHolidayAway()">Clear Away Dates</button>
+                </div>
+            </div>
+
+            <div class="add-extra-card">
+                <h4>➕ Add Manual Extra to Shift</h4>
+                <div class="form-row">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <input type="text" id="extraNameInput" placeholder="Name (e.g. Alex Temp)">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <input type="text" id="extraCommentInput" placeholder="Comment/Note (e.g. Volunteer)">
+                    </div>
+                    <button type="button" class="btn-sm primary" onclick="UI.addExtraToRoster()" style="height: 42px; flex-shrink: 0;">Add Extra</button>
+                </div>
+            </div>
+
+            <h3 id="rosteredListHeading">Currently Rostered (0)</h3>
+            <ul id="rosteredList" class="item-list"></ul>
+
+            <h3 id="extrasListHeading">Manual Extras (0)</h3>
+            <ul id="extrasList" class="item-list"></ul>
+
+            <h3 id="unavailableListHeading">Away / Unavailable Staff (0)</h3>
+            <ul id="unavailableList" class="item-list"></ul>
+
+            <h3 id="availableListHeading">Available Staff (0)</h3>
+            <ul id="availableList" class="item-list"></ul>
+        </div>
+    </div>
+
+    <!-- Custom Dialog Modal -->
+    <div class="modal-overlay" id="customDialogModal" style="z-index: 2000;">
+        <div class="modal" style="text-align: center;">
+            <h2 id="customDialogTitle">Notice</h2>
+            <p id="customDialogMessage" style="margin: 15px 0; color: #4b5563; font-size: 1rem;"></p>
+            <div style="display:flex; justify-content: center; gap: 10px;" id="customDialogButtons"></div>
+        </div>
+    </div>
+
+    <!-- Utilities Modal -->
+    <div class="modal-overlay" id="utilitiesModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Utilities & Tools</h2>
+                <span class="modal-close" onclick="UI.closeModal('utilitiesModal')">&times;</span>
+            </div>
+
+            <div class="sim-bar-inline">
+                <strong>Time Simulation</strong>
+                <div class="controls">
+                    <span>Mock Date: <input type="date" id="simDateInput" onchange="Simulation.setDate(this.value)" style="padding: 4px 8px; border-radius:4px; border:1px solid #ccc;"></span>
+                    <button class="btn-sm warning" onclick="Simulation.advanceWeeks(1)">+1 Wk</button>
+                    <button class="btn-sm warning" onclick="Simulation.advanceWeeks(4)">+4 Wks</button>
+                    <button class="btn-sm secondary" onclick="Simulation.reset()">Reset</button>
+                </div>
+            </div>
+
+            <div class="utility-option">
+                <div class="btn-col"><button class="btn-action warning" onclick="Utilities.displayUnavailable()" style="width:100%;">Planned Away Staff</button></div>
+                <div>View all staff marked as away for the current roster cycle.</div>
+            </div>
+
+            <div class="utility-option">
+                <div class="btn-col"><button class="btn-action primary" onclick="ExportManager.exportCSV()" style="width:100%;">Export CSV</button></div>
+                <div>Export currently selected week rosters to CSV format.</div>
+            </div>
+
+            <div class="utility-option">
+                <div class="btn-col"><button class="btn-action success" onclick="Utilities.recalcRosters()" style="width:100%;">Recalculate</button></div>
+                <div>Recalculate all rosters while retaining valid assignments & overrides.</div>
+            </div>
+
+            <div class="utility-option">
+                <div class="btn-col"><button class="btn-action success" onclick="Utilities.exportData()" style="width:100%;">Export JSON</button></div>
+                <div>Download full JSON backup of teams, people, events, and rosters.</div>
+            </div>
+
+            <div class="utility-option">
+                <div class="btn-col"><button class="btn-action danger" onclick="Utilities.triggerImport()" style="width:100%;">Import JSON</button></div>
+                <div>Restore backup file. Overwrites existing cloud database!</div>
+            </div>
+            <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="Utilities.handleImport(event)">
+
+            <div style="display:flex; justify-content: flex-end; margin-top: 15px;">
+                <button type="button" class="btn-action secondary" onclick="UI.closeModal('utilitiesModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Away Overview Modal -->
+    <div class="modal-overlay" id="unavailableListModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Planned Away Staff</h2>
+                <span class="modal-close" onclick="UI.closeModal('unavailableListModal')">&times;</span>
+            </div>
+            <ul id="unavailableListContent" class="item-list"></ul>
+            <div style="display:flex; justify-content: flex-end; margin-top: 15px;">
+                <button type="button" class="btn-action secondary" onclick="UI.closeModal('unavailableListModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Roster Modal -->
+    <div class="modal-overlay" id="shareModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Share Rosters</h2>
+                <span class="modal-close" onclick="UI.closeModal('shareModal')">&times;</span>
+            </div>
+            <div class="form-group"><textarea id="shareTextOutput" class="share-output" readonly></textarea></div>
+            <div style="display:flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn-action secondary" onclick="UI.closeModal('shareModal')">Close</button>
+                <button type="button" class="btn-action success" onclick="ExportManager.copyShareText()">Copy Text</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBU8WAzQsTcc1QLqC0tSw4EcTHiIIPPhls",
+            authDomain: "rostermaster-d0d54.firebaseapp.com",
+            projectId: "rostermaster-d0d54",
+            storageBucket: "rostermaster-d0d54.firebasestorage.app",
+            messagingSenderId: "441998337898",
+            appId: "1:441998337898:web:5aebc306a718c460596713"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+
+        const DEMO_DATA = {
+            teams: [
+                { id: 101, name: "Morning Support" },
+                { id: 102, name: "Evening Operations" }
+            ],
+            people: [
+                { id: 1, name: "Digi Di", email: "digi.di@example.com", teamIds: [101], activeFrom: "", activeUntil: "", holidays: [], holidayDetails: "", awayDate: "" },
+                { id: 2, name: "Sam Taylor", email: "sam.taylor@example.com", teamIds: [101, 102], activeFrom: "", activeUntil: "", holidays: [], holidayDetails: "", awayDate: "" },
+                { id: 3, name: "Jordan Lee", email: "jordan.lee@example.com", teamIds: [102], activeFrom: "", activeUntil: "", holidays: [], holidayDetails: "", awayDate: "" }
+            ],
+            events: [
+                { id: 501, type: "REGULAR", title: "Weekday Briefing", location: "Main Hall", teamId: 101, minPeople: 1, maxPeople: 2, time: "09:00", recurrenceType: "WEEKLY", interval: 1, dayOfWeek: 1 },
+                { id: 502, type: "REGULAR", title: "Friday Wrap-Up", location: "Room B", teamId: 102, minPeople: 1, maxPeople: 2, time: "16:00", recurrenceType: "WEEKLY", interval: 1, dayOfWeek: 5 }
+            ],
+            closures: [],
+            rosters: {},
+            overrides: {},
+            lastSaved: ""
+        };
+
+        const Store = {
+            selectedWeeks: new Set(),
+            simulatedDate: null,
+            activeViewId: 'rosterView',
+            currentModalEventContext: null,
+            statusTimeout: null,
+            data: { teams: [], people: [], events: [], closures: [], rosters: {}, overrides: {}, lastSaved: "" },
+
+            cache: {
+                teamsMap: new Map(),
+                peopleMap: new Map(),
+                eventsMap: new Map(),
+                closuresMap: new Map()
+            },
+
+            rebuildCaches() {
+                this.cache.teamsMap = new Map(this.data.teams.map(t => [t.id, t]));
+                this.cache.peopleMap = new Map(this.data.people.map(p => [p.id, p]));
+                this.cache.eventsMap = new Map(this.data.events.map(e => [e.id, e]));
+                this.cache.closuresMap = new Map(this.data.closures.map(c => [c.id, c]));
+            },
+
+            autoSave() {
+                CloudSync.save();
+            }
+        };
+
+        const AuthManager = {
+            currentUser: null,
+            async handleAuthAction() {
+                if (this.currentUser) {
+                    try {
+                        await signOut(auth);
+                        UI.setStatusMessage("Signed out successfully.");
+                    } catch (err) {
+                        console.error("Sign out error:", err);
+                    }
+                } else {
+                    try {
+                        await signInWithPopup(auth, provider);
+                        UI.setStatusMessage("Signed in successfully.");
+                    } catch (err) {
+                        console.error("Sign in error:", err);
+                        if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+                            Dialog.alert("Authentication failed: " + err.message, "Sign-in Error");
+                        }
+                    }
+                }
+            }
+        };
+
+        const CloudSync = {
+            docRef: null,
+            unsubscribe: null,
+            init() {
+                if (this.unsubscribe) this.unsubscribe();
+                
+                // Directly reference document under the rosters collection
+                this.docRef = doc(db, 'rosters', 'main');
+
+                this.unsubscribe = onSnapshot(this.docRef, (snapshot) => {
+                    const badge = document.getElementById('syncBadge');
+                    if (snapshot.exists()) {
+                        const incomingData = snapshot.data().rosterData;
+                        const validated = Storage.validateAndRepair(incomingData);
+
+                        Store.data = validated.valid ? validated.data : validated.repairedData;
+                        Store.rebuildCaches();
+                        UI.renderRoster();
+                        UI.refreshCurrentView();
+
+                        badge.className = 'sync-badge';
+                        badge.innerText = 'Connected';
+                        document.getElementById('lastSavedDisplay').innerText = `Updated: ${Utils.formatShortDateTime(Store.data.lastSaved)}`;
+                    } else {
+                        Store.data = JSON.parse(JSON.stringify(DEMO_DATA));
+                        Store.rebuildCaches();
+                        CoreLogic.recalculateRosters();
+                        this.save(true);
+                    }
+                }, (error) => {
+                    console.error("Firestore Sync error:", error);
+                    const badge = document.getElementById('syncBadge');
+                    badge.className = 'sync-badge error';
+                    badge.innerText = 'Sync Error';
+                });
+            },
+
+            async save(force = false) {
+                if (Store.simulatedDate !== null && !force) return;
+                if (!this.docRef) return;
+
+                Store.data.lastSaved = new Date().toISOString();
+                try {
+                    await setDoc(this.docRef, { rosterData: Store.data }, { merge: true });
+                } catch (e) {
+                    console.error("Failed to push updates", e);
+                }
+            }
+        };
+
+        const Dialog = {
+            alert(msg, title = "Notice") {
+                document.getElementById('customDialogTitle').innerText = title;
+                document.getElementById('customDialogMessage').innerText = msg;
+                const btnContainer = document.getElementById('customDialogButtons');
+                btnContainer.innerHTML = `<button class="btn-action success" onclick="UI.closeModal('customDialogModal')">OK</button>`;
+                UI.openModal('customDialogModal');
+            },
+            confirm(msg, onConfirm, title = "Confirm Action") {
+                document.getElementById('customDialogTitle').innerText = title;
+                document.getElementById('customDialogMessage').innerText = msg;
+                const btnContainer = document.getElementById('customDialogButtons');
+                btnContainer.innerHTML = `
+                    <button class="btn-action secondary" onclick="UI.closeModal('customDialogModal')">Cancel</button>
+                    <button class="btn-action danger" id="dialogConfirmBtn">Confirm</button>
+                `;
+                document.getElementById('dialogConfirmBtn').onclick = () => {
+                    UI.closeModal('customDialogModal');
+                    if(onConfirm) onConfirm();
+                };
+                UI.openModal('customDialogModal');
+            }
+        };
+
+        const Simulation = {
+            getNow() {
+                return Store.simulatedDate ? new Date(Store.simulatedDate) : new Date();
+            },
+            setDate(dateStr) {
+                Store.simulatedDate = dateStr ? Utils.parseLocalDate(dateStr) : null;
+                UI.renderRoster();
+            },
+            advanceWeeks(n) {
+                const current = this.getNow();
+                current.setDate(current.getDate() + (n * 7));
+                Store.simulatedDate = current;
+                document.getElementById('simDateInput').value = Utils.formatDate(current);
+                UI.renderRoster();
+            },
+            reset() {
+                Store.simulatedDate = null;
+                document.getElementById('simDateInput').value = '';
+                UI.renderRoster();
+            }
+        };
+
+        const Storage = {
+            validateAndRepair(raw) {
+                const errors = [];
+                let repaired = false;
+
+                if (!raw || typeof raw !== 'object') {
+                    return { valid: false, errors: ['Payload is not a valid JSON object.'] };
+                }
+
+                ['teams', 'people', 'events', 'closures'].forEach(key => {
+                    if (!Array.isArray(raw[key])) {
+                        errors.push(`Key '${key}' missing or invalid array.`);
+                        raw[key] = [];
+                        repaired = true;
+                    }
+                });
+
+                if (raw.people && Array.isArray(raw.people)) {
+                    raw.people.forEach(p => {
+                        if (typeof p.email !== 'string') p.email = "";
+                        if (typeof p.holidayDetails !== 'string') p.holidayDetails = "";
+                        if (typeof p.awayDate !== 'string') p.awayDate = "";
+                    });
+                }
+
+                if (typeof raw.rosters !== 'object' || !raw.rosters) {
+                    errors.push("Key 'rosters' missing or invalid.");
+                    raw.rosters = {};
+                    repaired = true;
+                }
+
+                if (typeof raw.overrides !== 'object' || !raw.overrides) {
+                    raw.overrides = {};
+                    repaired = true;
+                }
+
+                if (typeof raw.lastSaved !== 'string') {
+                    raw.lastSaved = "";
+                }
+
+                return {
+                    valid: errors.length === 0,
+                    repaired,
+                    errors,
+                    data: raw,
+                    repairedData: raw
+                };
+            }
+        };
+
+        const Utilities = {
+            recalcRosters() {
+                CoreLogic.recalculateRosters();
+                UI.closeModal('utilitiesModal');
+                UI.setStatusMessage('Rosters recalculated and saved.');
+                Dialog.alert('Rosters successfully recalculated and updated across devices.');
+            },
+
+            displayUnavailable() {
+                const weeks = Utils.getNext10Weeks();
+                const startDateStr = Utils.formatDate(Simulation.getNow());
+                const endDateObj = new Date(weeks[weeks.length - 1]);
+                endDateObj.setDate(endDateObj.getDate() + 6);
+                const endDateStr = Utils.formatDate(endDateObj);
+
+                const unavailableRecords = [];
+
+                Store.data.people.forEach(person => {
+                    const plans = [];
+
+                    if (person.activeFrom && person.activeFrom > startDateStr) {
+                        plans.push(`Not active until ${Utils.formatReadableDate(person.activeFrom)}`);
+                    }
+                    if (person.activeUntil && person.activeUntil < endDateStr) {
+                        plans.push(`Active period ends ${Utils.formatReadableDate(person.activeUntil)}`);
+                    }
+                    if (person.awayDate && person.awayDate >= startDateStr && person.awayDate <= endDateStr) {
+                        plans.push(`Set as Away on ${Utils.formatReadableDate(person.awayDate)}`);
+                    }
+                    if (person.holidays) {
+                        person.holidays.forEach(h => {
+                            if (h.end >= startDateStr && h.start <= endDateStr) {
+                                const details = person.holidayDetails ? ` (${person.holidayDetails})` : '';
+                                plans.push(`Away: ${Utils.formatReadableDate(h.start)} to ${Utils.formatReadableDate(h.end)}${details}`);
+                            }
+                        });
+                    }
+
+                    if (plans.length > 0) {
+                        unavailableRecords.push({ person, plans });
+                    }
+                });
+
+                const listEl = document.getElementById('unavailableListContent');
+                listEl.innerHTML = '';
+
+                if (unavailableRecords.length === 0) {
+                    listEl.innerHTML = '<li><em>No staff are currently marked as away for this roster cycle.</em></li>';
+                } else {
+                    unavailableRecords.sort((a,b) => a.person.name.localeCompare(b.person.name)).forEach(item => {
+                        const li = document.createElement('li');
+                        li.style.flexDirection = 'column';
+                        li.style.alignItems = 'flex-start';
+                        li.innerHTML = `<strong>${item.person.name}</strong><ul style="margin: 4px 0 0 16px; padding: 0; color: #d97706; font-size: 0.85rem;">${item.plans.map(p => `<li>${p}</li>`).join('')}</ul>`;
+                        listEl.appendChild(li);
+                    });
+                }
+
+                UI.openModal('unavailableListModal');
+            },
+
+            exportData() {
+                const dataStr = JSON.stringify(Store.data, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                const exportFileDefaultName = `RosterMatic_Backup_${Utils.formatDate(new Date())}.json`;
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+            },
+
+            triggerImport() {
+                Dialog.confirm("Are you sure? Importing a file will completely overwrite existing rosters for all connected users.", () => {
+                    document.getElementById('importFileInput').click();
+                }, "Overwrite Warning");
+            },
+
+            handleImport(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const rawData = JSON.parse(e.target.result);
+                        const validated = Storage.validateAndRepair(rawData);
+
+                        if (validated.valid || validated.repaired) {
+                            Store.data = validated.valid ? validated.data : validated.repairedData;
+                            Store.rebuildCaches();
+                            CoreLogic.recalculateRosters();
+                            CloudSync.save(true);
+
+                            UI.closeModal('utilitiesModal');
+                            UI.renderRoster();
+                            UI.refreshCurrentView();
+                            Dialog.alert("Data successfully imported and synchronized.", "Import Complete");
+                        } else {
+                            Dialog.alert("The selected file contains invalid data.", "Import Error");
+                        }
+                    } catch (error) {
+                        console.error("Import error:", error);
+                        Dialog.alert("Could not parse the selected file. Ensure it is a valid RosterMatic JSON backup.", "Import Error");
+                    }
+                    event.target.value = '';
+                };
+                reader.readAsText(file);
+            }
+        };
+
+        const Utils = {
+            formatDate(date) {
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            },
+            parseLocalDate(dateStr) {
+                if (!dateStr) return null;
+                return new Date(dateStr + 'T00:00:00');
+            },
+            formatReadableDate(dateStr) {
+                if (!dateStr) return '';
+                return this.parseLocalDate(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+            },
+            formatShortDateTime(isoString) {
+                if (!isoString) return 'Never';
+                const d = new Date(isoString);
+                if (isNaN(d.getTime())) return 'Never';
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mmm = d.toLocaleDateString('en-NZ', { month: 'short' });
+                return `${hh}:${mm} ${dd}-${mmm}`;
+            },
+            getShortDate(date) {
+                return date.toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' });
+            },
+            getISOWeekNumber(d) {
+                const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+                const dayNum = date.getUTCDay() || 7;
+                date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+                const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+                return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+            },
+            getNext10Weeks() {
+                const weeks = [];
+                const curr = Simulation.getNow();
+                curr.setHours(0, 0, 0, 0);
+                curr.setDate(curr.getDate() - (curr.getDay() || 7) + 1);
+                for (let i = 0; i < 10; i++) {
+                    const weekStart = new Date(curr);
+                    weekStart.setDate(weekStart.getDate() + (i * 7));
+                    weeks.push(weekStart);
+                }
+                return weeks;
+            }
+        };
+
+        const CoreLogic = {
+            getOverrideRecord(weekKey, eventId) {
+                if (!Store.data.overrides) Store.data.overrides = {};
+                if (!Store.data.overrides[weekKey]) Store.data.overrides[weekKey] = {};
+                if (!Store.data.overrides[weekKey][eventId]) {
+                    Store.data.overrides[weekKey][eventId] = { excludedPersonIds: [], extras: [] };
+                }
+                return Store.data.overrides[weekKey][eventId];
+            },
+
+            getClosureForEvent(eventId, dateStr) {
+                return Store.data.closures.find(c => {
+                    if (c.type === "INFO") return false;
+                    const start = c.startDate;
+                    const end = c.endDate || c.startDate;
+                    return (dateStr >= start && dateStr <= end) && (c.target === "ALL" || c.target == eventId);
+                }) || null;
+            },
+
+            getWeeklyInfoEvents(weekStart) {
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekEnd.getDate() + 6);
+                const weekStartStr = Utils.formatDate(weekStart);
+                const weekEndStr = Utils.formatDate(weekEnd);
+
+                return Store.data.closures.filter(c => {
+                    if (c.type !== "INFO") return false;
+                    const start = c.startDate;
+                    const end = c.endDate || c.startDate;
+                    return (start <= weekEndStr && end >= weekStartStr);
+                });
+            },
+
+            isPersonActiveOnDate(person, dateStr) {
+                if (person.activeFrom && dateStr < person.activeFrom) return false;
+                if (person.activeUntil && dateStr > person.activeUntil) return false;
+                return true;
+            },
+
+            getPersonUnavailabilityReason(person, dateStr) {
+                if (person.activeFrom && dateStr < person.activeFrom) return `Not active until ${Utils.formatReadableDate(person.activeFrom)}`;
+                if (person.activeUntil && dateStr > person.activeUntil) return `Inactive (ended ${Utils.formatReadableDate(person.activeUntil)})`;
+                if (person.awayDate && dateStr === person.awayDate) return `Set as Away on ${Utils.formatReadableDate(person.awayDate)}`;
+                if (person.holidays) {
+                    for (let h of person.holidays) {
+                        if (dateStr >= h.start && dateStr <= h.end) {
+                            const detailsStr = person.holidayDetails ? ` (${person.holidayDetails})` : '';
+                            return `Away until ${Utils.formatReadableDate(h.end)}${detailsStr}`;
+                        }
+                    }
+                }
+                return null;
+            },
+
+            isPersonAvailable(person, dateStr) {
+                return this.getPersonUnavailabilityReason(person, dateStr) === null;
+            },
+
+            getPersonAwayReason(person, dateStr) {
+                if (!this.isPersonActiveOnDate(person, dateStr)) return null;
+                if (person.awayDate && dateStr === person.awayDate) return `Set as Away on ${Utils.formatReadableDate(person.awayDate)}`;
+                if (person.holidays) {
+                    for (let h of person.holidays) {
+                        if (dateStr >= h.start && dateStr <= h.end) {
+                            const detailsStr = person.holidayDetails ? ` (${person.holidayDetails})` : '';
+                            return `Away until ${Utils.formatReadableDate(h.end)}${detailsStr}`;
+                        }
+                    }
+                }
+                return null;
+            },
+
+            isEventActiveOnDate(ev, dateObj) {
+                const dateStr = Utils.formatDate(dateObj);
+                if (ev.type === "SPECIAL") return ev.specialDate === dateStr;
+                if (ev.startDate && dateStr < ev.startDate) return false;
+                if (ev.endDate && dateStr > ev.endDate) return false;
+
+                const dayOfWeek = dateObj.getDay();
+                if (ev.recurrenceType === "MONTHLY_NTH") {
+                    if (dayOfWeek !== ev.nthDayOfWeek) return false;
+                    const year = dateObj.getFullYear(), month = dateObj.getMonth(), dayOfMonth = dateObj.getDate();
+                    if (ev.nthOrder === 5) {
+                        return (dayOfMonth + 7) > new Date(year, month + 1, 0).getDate();
+                    }
+                    return Math.ceil(dayOfMonth / 7) === ev.nthOrder;
+                } else {
+                    if (dayOfWeek !== ev.dayOfWeek) return false;
+                    if (ev.interval && ev.interval > 1) {
+                        const baseDate = ev.startDate ? Utils.parseLocalDate(ev.startDate) : new Date(2026, 0, 5);
+                        const diffDays = Math.ceil(Math.abs(dateObj - baseDate) / 86400000);
+                        return Math.floor(diffDays / 7) % ev.interval === 0;
+                    }
+                    return true;
+                }
+            },
+
+            getUpcomingRosteredDatesForPerson(person) {
+                const rosteredDates = [];
+                const weeks = Utils.getNext10Weeks();
+
+                for (let weekStart of weeks) {
+                    const weekEvents = this.generateWeeklyEvents(weekStart);
+                    for (let ev of weekEvents) {
+                        if (ev.assigned.includes(person.id) && !rosteredDates.includes(ev.dateStr)) {
+                            rosteredDates.push(ev.dateStr);
+                            if (rosteredDates.length >= 10) return rosteredDates;
+                        }
+                    }
+                }
+                return rosteredDates;
+            },
+
+            generateWeeklyEvents(weekStart) {
+                const weekKey = Utils.formatDate(weekStart);
+                if (!Store.data.rosters[weekKey]) Store.data.rosters[weekKey] = {};
+                const weekEvents = [];
+
+                Store.data.events.forEach(ev => {
+                    for (let i = 0; i < 7; i++) {
+                        const eventDate = new Date(weekStart);
+                        eventDate.setDate(eventDate.getDate() + i);
+
+                        if (this.isEventActiveOnDate(ev, eventDate)) {
+                            const dateStr = Utils.formatDate(eventDate);
+                            const closure = this.getClosureForEvent(ev.id, dateStr);
+                            const overrideRec = this.getOverrideRecord(weekKey, ev.id);
+
+                            if (closure) {
+                                Store.data.rosters[weekKey][ev.id] = [];
+                            } else {
+                                const currentAssignments = (Store.data.rosters[weekKey][ev.id] || []).filter(pId => {
+                                    const person = Store.cache.peopleMap.get(pId);
+                                    const isExcluded = overrideRec.excludedPersonIds.includes(pId);
+                                    return person && !isExcluded && this.isPersonAvailable(person, dateStr);
+                                });
+
+                                const capacity = ev.maxPeople || 99;
+                                if (ev.teamId && currentAssignments.length < capacity) {
+                                    const availableTeamMembers = Store.data.people.filter(p =>
+                                        p.teamIds?.includes(ev.teamId) &&
+                                        !overrideRec.excludedPersonIds.includes(p.id) &&
+                                        this.isPersonAvailable(p, dateStr)
+                                    );
+                                    for (let candidate of availableTeamMembers) {
+                                        if (currentAssignments.length >= capacity) break;
+                                        if (!currentAssignments.includes(candidate.id)) {
+                                            currentAssignments.push(candidate.id);
+                                        }
+                                    }
+                                }
+                                Store.data.rosters[weekKey][ev.id] = currentAssignments;
+                            }
+
+                            const validAssigned = closure ? [] : (Store.data.rosters[weekKey][ev.id] || []).filter(pId => {
+                                const person = Store.cache.peopleMap.get(pId);
+                                return person && !overrideRec.excludedPersonIds.includes(pId) && this.isPersonAvailable(person, dateStr);
+                            });
+
+                            weekEvents.push({
+                                ...ev,
+                                dateStr,
+                                actualDate: eventDate,
+                                closure,
+                                assigned: validAssigned,
+                                extras: overrideRec.extras || [],
+                                hasExclusions: overrideRec.excludedPersonIds.length > 0
+                            });
+                        }
+                    }
+                });
+
+                return weekEvents.sort((a, b) => {
+                    const dateDiff = a.actualDate - b.actualDate;
+                    if (dateDiff !== 0) return dateDiff;
+                    return (a.time || '').localeCompare(b.time || '');
+                });
+            },
+
+            syncTeamMembersToRosters(teamId, personId = null) {
+                const weeks = Utils.getNext10Weeks();
+                const todayStr = Utils.formatDate(Simulation.getNow());
+
+                weeks.forEach(weekStart => {
+                    const weekKey = Utils.formatDate(weekStart);
+                    if (!Store.data.rosters[weekKey]) Store.data.rosters[weekKey] = {};
+
+                    Store.data.events.filter(ev => ev.teamId === teamId).forEach(ev => {
+                        for (let i = 0; i < 7; i++) {
+                            const eventDate = new Date(weekStart);
+                            eventDate.setDate(eventDate.getDate() + i);
+                            const dateStr = Utils.formatDate(eventDate);
+
+                            if (this.getClosureForEvent(ev.id, dateStr)) {
+                                Store.data.rosters[weekKey][ev.id] = [];
+                                continue;
+                            }
+
+                            if (dateStr >= todayStr && this.isEventActiveOnDate(ev, eventDate)) {
+                                if (!Store.data.rosters[weekKey][ev.id]) Store.data.rosters[weekKey][ev.id] = [];
+
+                                const overrideRec = this.getOverrideRecord(weekKey, ev.id);
+
+                                let currentAssignments = Store.data.rosters[weekKey][ev.id].filter(pId => {
+                                    const p = Store.cache.peopleMap.get(pId);
+                                    return p && !overrideRec.excludedPersonIds.includes(pId) && this.isPersonAvailable(p, dateStr);
+                                });
+
+                                const maxAllowed = ev.maxPeople || 99;
+
+                                const candidates = personId
+                                    ? Store.data.people.filter(p => p.id === personId)
+                                    : Store.data.people.filter(p => p.teamIds?.includes(teamId));
+
+                                candidates.forEach(person => {
+                                    if (person.teamIds.includes(teamId) &&
+                                        !overrideRec.excludedPersonIds.includes(person.id) &&
+                                        this.isPersonAvailable(person, dateStr)) {
+                                        if (!currentAssignments.includes(person.id) && currentAssignments.length < maxAllowed) {
+                                            currentAssignments.push(person.id);
+                                        }
+                                    }
+                                });
+                                Store.data.rosters[weekKey][ev.id] = currentAssignments;
+                            }
+                        }
+                    });
+                });
+                Store.autoSave();
+            },
+
+            recalculateRosters() {
+                const weeks = Utils.getNext10Weeks();
+
+                weeks.forEach(weekStart => {
+                    const weekKey = Utils.formatDate(weekStart);
+                    if (!Store.data.rosters[weekKey]) Store.data.rosters[weekKey] = {};
+
+                    Store.data.events.forEach(ev => {
+                        for (let i = 0; i < 7; i++) {
+                            const eventDate = new Date(weekStart);
+                            eventDate.setDate(eventDate.getDate() + i);
+                            const dateStr = Utils.formatDate(eventDate);
+
+                            if (this.isEventActiveOnDate(ev, eventDate)) {
+                                if (this.getClosureForEvent(ev.id, dateStr)) {
+                                    Store.data.rosters[weekKey][ev.id] = [];
+                                    continue;
+                                }
+
+                                if (!Store.data.rosters[weekKey][ev.id]) {
+                                    Store.data.rosters[weekKey][ev.id] = [];
+                                }
+
+                                const overrideRec = this.getOverrideRecord(weekKey, ev.id);
+
+                                const currentAssigned = Store.data.rosters[weekKey][ev.id];
+                                const keptAssignments = currentAssigned.filter(pId => {
+                                    const p = Store.cache.peopleMap.get(pId);
+                                    return p && !overrideRec.excludedPersonIds.includes(pId) && this.isPersonAvailable(p, dateStr);
+                                });
+
+                                const maxLimit = ev.maxPeople || 99;
+
+                                if (ev.teamId && keptAssignments.length < maxLimit) {
+                                    const teamMembers = Store.data.people.filter(p =>
+                                        p.teamIds?.includes(ev.teamId) &&
+                                        !overrideRec.excludedPersonIds.includes(p.id) &&
+                                        this.isPersonAvailable(p, dateStr)
+                                    );
+
+                                    for (let p of teamMembers) {
+                                        if (keptAssignments.length >= maxLimit) break;
+                                        if (!keptAssignments.includes(p.id)) {
+                                            keptAssignments.push(p.id);
+                                        }
+                                    }
+                                }
+
+                                Store.data.rosters[weekKey][ev.id] = keptAssignments.slice(0, maxLimit);
+                            }
+                        }
+                    });
+                });
+
+                Store.autoSave();
+                UI.renderRoster();
+            }
+        };
+
+        const UI = {
+            setStatusMessage(msg) {
+                const banner = document.getElementById('statusBanner');
+                banner.innerText = msg;
+                banner.style.display = 'block';
+                if (Store.statusTimeout) clearTimeout(Store.statusTimeout);
+                Store.statusTimeout = setTimeout(() => { banner.style.display = 'none'; }, 8000);
+            },
+
+            showView(viewId) {
+                document.querySelectorAll('.app-view').forEach(el => el.classList.remove('active-view'));
+
+                const targetView = document.getElementById(viewId);
+                if (targetView) targetView.classList.add('active-view');
+
+                Store.activeViewId = viewId;
+
+                document.querySelectorAll('#mainToolbar .nav-btn').forEach(btn => btn.classList.remove('active'));
+                if (viewId === 'rosterView') document.getElementById('btnNavRoster').classList.add('active');
+                if (viewId === 'teamsView') document.getElementById('btnNavTeams').classList.add('active');
+                if (viewId === 'peopleView') document.getElementById('btnNavPeople').classList.add('active');
+                if (viewId === 'eventsView') document.getElementById('btnNavEvents').classList.add('active');
+                if (viewId === 'calendarView') document.getElementById('btnNavCalendar').classList.add('active');
+
+                this.refreshCurrentView();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+
+            refreshCurrentView() {
+                if (Store.activeViewId === 'teamsView') TeamsManager.populate();
+                if (Store.activeViewId === 'peopleView') PeopleManager.populate();
+                if (Store.activeViewId === 'eventsView') EventsManager.populate();
+                if (Store.activeViewId === 'calendarView') ClosuresManager.populate();
+            },
+
+            renderRoster() {
+                const container = document.getElementById('rosterContainer');
+                container.innerHTML = '';
+                const weeks = Utils.getNext10Weeks();
+
+                weeks.forEach((weekStart, idx) => {
+                    const weekKey = Utils.formatDate(weekStart);
+                    const events = CoreLogic.generateWeeklyEvents(weekStart);
+                    const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
+                    const isCurrent = idx === 0;
+
+                    const isoWeekNum = Utils.getISOWeekNumber(weekStart);
+
+                    const infoEvents = CoreLogic.getWeeklyInfoEvents(weekStart);
+                    const infoBadges = infoEvents.map(ie => `<span class="badge badge-info">ℹ️ ${ie.name} (${Utils.formatReadableDate(ie.startDate)}${ie.endDate && ie.endDate !== ie.startDate ? ' - ' + Utils.formatReadableDate(ie.endDate) : ''})</span>`).join(' ');
+
+                    const weekDiv = document.createElement('div');
+                    weekDiv.className = `week-card ${isCurrent ? 'current-week' : ''}`;
+                    weekDiv.innerHTML = `
+                        <div class="week-header">
+                            <input type="checkbox" ${Store.selectedWeeks.has(weekKey) ? 'checked' : ''} onchange="UI.toggleWeek('${weekKey}', this.checked)">
+                            <span>Week ${isoWeekNum}: ${Utils.getShortDate(weekStart)} - ${Utils.getShortDate(weekEnd)}</span>
+                            ${isCurrent ? '<span class="badge badge-current">Current Week</span>' : ''}
+                            ${infoBadges}
+                        </div>`;
+
+                    const eventsByDay = {};
+                    for (let i = 0; i < 7; i++) {
+                        const dObj = new Date(weekStart);
+                        dObj.setDate(dObj.getDate() + i);
+                        const dateStr = Utils.formatDate(dObj);
+                        eventsByDay[dateStr] = {
+                            dateObj: dObj,
+                            dateStr,
+                            dayName: dObj.toLocaleDateString('en-NZ', { weekday: 'short' }),
+                            fullDayName: dObj.toLocaleDateString('en-NZ', { weekday: 'long' }),
+                            shortDateStr: Utils.getShortDate(dObj),
+                            events: []
+                        };
+                    }
+
+                    events.forEach(ev => {
+                        if (eventsByDay[ev.dateStr]) {
+                            eventsByDay[ev.dateStr].events.push(ev);
+                        }
+                    });
+
+                    const grid = document.createElement('div');
+                    grid.className = 'week-calendar-grid';
+
+                    Object.values(eventsByDay).forEach(dayData => {
+                        if (dayData.events.length === 0) return;
+
+                        const allGreen = dayData.events.every(ev => {
+                            if (ev.closure) return true;
+                            return ev.assigned.length >= ev.minPeople && ev.assigned.length <= ev.maxPeople;
+                        });
+
+                        const headerColorClass = allGreen ? 'header-green' : 'header-orange';
+
+                        const dayCol = document.createElement('div');
+                        dayCol.className = 'day-column';
+
+                        const dayHeader = document.createElement('div');
+                        dayHeader.className = `day-column-header ${headerColorClass}`;
+                        dayHeader.innerText = `${dayData.dayName}, ${dayData.shortDateStr}`;
+                        dayCol.appendChild(dayHeader);
+
+                        const mobileHeader = document.createElement('div');
+                        mobileHeader.className = `mobile-day-header ${headerColorClass}`;
+                        mobileHeader.innerText = `${dayData.fullDayName.toUpperCase()} ${dayData.shortDateStr.toUpperCase()}`;
+
+                        const daySection = document.createElement('div');
+                        daySection.className = 'mobile-day-section';
+                        daySection.appendChild(mobileHeader);
+
+                        dayData.events.forEach(ev => {
+                            const isClosed = !!ev.closure;
+                            const isUnderstaffed = !isClosed && (ev.assigned.length < ev.minPeople);
+                            const card = document.createElement('div');
+                            card.className = `event-card ${isClosed ? 'closed-event' : ''} ${isUnderstaffed ? 'understaffed' : ''} ${!isClosed && ev.type === 'SPECIAL' ? 'special-event' : ''}`;
+
+                            if (!isClosed) card.onclick = () => UI.openEventModal(weekKey, ev);
+
+                            const names = ev.assigned
+                                .map(id => Store.cache.peopleMap.get(id)?.name)
+                                .filter(Boolean).sort().join(', ');
+
+                            let extrasHtml = '';
+                            if (ev.extras && ev.extras.length > 0) {
+                                const extrasText = ev.extras.map(x => `${x.name}${x.comment ? ' (' + x.comment + ')' : ''}`).join(', ');
+                                extrasHtml = `<div class="event-extras">➕ <strong>Extras:</strong> ${extrasText}</div>`;
+                            }
+
+                            let awayTeamMembersHtml = '';
+                            if (!isClosed && ev.teamId) {
+                                const awayMembers = Store.data.people
+                                    .filter(p => p.teamIds?.includes(ev.teamId) && CoreLogic.getPersonAwayReason(p, ev.dateStr) !== null)
+                                    .map(p => p.name)
+                                    .sort();
+
+                                if (awayMembers.length > 0) {
+                                    awayTeamMembersHtml = `<div class="event-away"><strong>Away:</strong> ${awayMembers.join(', ')}</div>`;
+                                }
+                            }
+
+                            let dotColorClass = '';
+                            if (!isClosed) {
+                                const count = ev.assigned.length;
+                                if (count < ev.minPeople) dotColorClass = 'red';
+                                else if (count > ev.maxPeople) dotColorClass = 'orange';
+                                else dotColorClass = 'green';
+                            }
+
+                            const statusDotHtml = !isClosed ? `<span class="status-dot ${dotColorClass}"></span>` : '';
+
+                            card.innerHTML = `
+                                <div class="event-title">
+                                    <span>${ev.title} ${isClosed ? '<span class="badge badge-closed">CLOSED</span>' : (ev.type === 'SPECIAL' ? '<span class="badge badge-special">SPECIAL</span>' : '')}</span>
+                                    ${statusDotHtml}
+                                </div>
+                                <div class="event-meta">${ev.time} | Min: ${ev.minPeople} | Max: ${ev.maxPeople}</div>
+                                <div class="event-roster">${isClosed ? `🔒 <strong>CLOSED: ${ev.closure.name}</strong><br><em>No staff scheduled</em>` : `<strong>Roster:</strong> ${names || '<em>None</em>'}`}</div>
+                                ${extrasHtml}
+                                ${awayTeamMembersHtml}
+                            `;
+                            dayCol.appendChild(card);
+                        });
+
+                        grid.appendChild(dayCol);
+                    });
+
+                    weekDiv.appendChild(grid);
+                    container.appendChild(weekDiv);
+                });
+            },
+
+            toggleWeek(weekKey, checked) {
+                checked ? Store.selectedWeeks.add(weekKey) : Store.selectedWeeks.delete(weekKey);
+            },
+
+            openModal(id) { document.getElementById(id).style.display = 'flex'; },
+            closeModal(id) { document.getElementById(id).style.display = 'none'; },
+
+            openEventModal(weekKey, ev) {
+                Store.currentModalEventContext = { weekKey, ev };
+                this.closeDirectPersonEditor();
+
+                document.getElementById('modalTitle').innerText = ev.title;
+                document.getElementById('modalMeta').innerText = `Date: ${ev.dateStr} | Time: ${ev.time} | Cap: ${ev.minPeople}-${ev.maxPeople}`;
+
+                const rostered = document.getElementById('rosteredList');
+                const available = document.getElementById('availableList');
+                const unavailable = document.getElementById('unavailableList');
+                const extrasList = document.getElementById('extrasList');
+
+                rostered.innerHTML = ''; available.innerHTML = ''; unavailable.innerHTML = ''; extrasList.innerHTML = '';
+
+                const overrideRec = CoreLogic.getOverrideRecord(weekKey, ev.id);
+
+                const extras = overrideRec.extras || [];
+                if (extras.length === 0) {
+                    extrasList.innerHTML = '<li><em>No extra entries added to this shift.</em></li>';
+                } else {
+                    extras.forEach(extra => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `
+                            <div class="item-info">
+                                <strong>${extra.name}</strong> <span class="badge badge-extra">${extra.comment || 'Extra'}</span>
+                            </div>
+                            <div class="actions-cell">
+                                <button class="btn-sm danger" id="btnRemoveExtra_${extra.id}">Remove Extra</button>
+                            </div>`;
+                        extrasList.appendChild(li);
+                        li.querySelector(`#btnRemoveExtra_${extra.id}`).onclick = () => {
+                            UI.removeExtraFromRoster(extra.id);
+                        };
+                    });
+                }
+
+                let cRostered = 0, cUnavail = 0, cAvail = 0;
+                [...Store.data.people].sort((a, b) => a.name.localeCompare(b.name)).forEach(p => {
+                    const reason = CoreLogic.getPersonUnavailabilityReason(p, ev.dateStr);
+                    const isActive = CoreLogic.isPersonActiveOnDate(p, ev.dateStr);
+
+                    const li = document.createElement('li');
+
+                    if (reason !== null) {
+                        cUnavail++;
+                        const statusClass = isActive ? 'status-away' : 'status-inactive';
+                        li.innerHTML = `
+                            <div class="item-info">
+                                <strong>${p.name}</strong> <span class="${statusClass}">(${reason})</span>
+                            </div>
+                            <div class="actions-cell">
+                                <button class="btn-sm warning" onclick="UI.openDirectPersonEditor(${p.id})">Edit Dates</button>
+                            </div>`;
+                        unavailable.appendChild(li);
+                    } else if (ev.assigned.includes(p.id)) {
+                        cRostered++;
+                        li.innerHTML = `
+                            <div class="item-info">
+                                <strong>${p.name}</strong>
+                            </div>
+                            <div class="actions-cell">
+                                <button class="btn-sm warning" onclick="UI.openDirectPersonEditor(${p.id})">Edit Dates</button>
+                                <button class="btn-sm danger" id="btnRemove_${p.id}">Remove</button>
+                            </div>`;
+                        rostered.appendChild(li);
+
+                        li.querySelector(`#btnRemove_${p.id}`).onclick = () => {
+                            if (!overrideRec.excludedPersonIds.includes(p.id)) {
+                                overrideRec.excludedPersonIds.push(p.id);
+                            }
+                            Store.data.rosters[weekKey][ev.id] = ev.assigned.filter(id => id !== p.id);
+                            Store.autoSave();
+                            UI.renderRoster();
+                            UI.openEventModal(weekKey, { ...ev, assigned: Store.data.rosters[weekKey][ev.id] });
+                            UI.setStatusMessage(`Removed ${p.name} (Override saved for this shift)`);
+                        };
+                    } else {
+                        cAvail++;
+                        const matchesTeam = !ev.teamId || p.teamIds?.includes(ev.teamId);
+                        const isExcluded = overrideRec.excludedPersonIds.includes(p.id);
+
+                        li.innerHTML = `
+                            <div class="item-info">
+                                <strong>${p.name}</strong> ${isExcluded ? '<span class="badge badge-override">Removed Override</span>' : ''}
+                            </div>
+                            <div class="actions-cell">
+                                <button class="btn-sm warning" onclick="UI.openDirectPersonEditor(${p.id})">Edit Dates</button>
+                                <button class="btn-sm ${matchesTeam ? 'primary' : 'warning'}" id="btnAdd_${p.id}">${matchesTeam ? 'Add' : 'Add (Out)'}</button>
+                            </div>`;
+                        available.appendChild(li);
+
+                        li.querySelector(`#btnAdd_${p.id}`).onclick = () => {
+                            overrideRec.excludedPersonIds = overrideRec.excludedPersonIds.filter(id => id !== p.id);
+                            if (!Store.data.rosters[weekKey][ev.id]) Store.data.rosters[weekKey][ev.id] = [];
+                            if (!Store.data.rosters[weekKey][ev.id].includes(p.id)) {
+                                Store.data.rosters[weekKey][ev.id].push(p.id);
+                            }
+                            Store.autoSave();
+                            UI.renderRoster();
+                            UI.openEventModal(weekKey, { ...ev, assigned: Store.data.rosters[weekKey][ev.id] });
+                            UI.setStatusMessage(`Added ${p.name} to shift`);
+                        };
+                    }
+                });
+
+                document.getElementById('rosteredListHeading').innerText = `Currently Rostered (${cRostered})`;
+                document.getElementById('extrasListHeading').innerText = `Manual Extras (${extras.length})`;
+                document.getElementById('unavailableListHeading').innerText = `Away / Unavailable Staff (${cUnavail})`;
+                document.getElementById('availableListHeading').innerText = `Available Staff (${cAvail})`;
+                this.openModal('eventModal');
+            },
+
+            addExtraToRoster() {
+                if (!Store.currentModalEventContext) return;
+                const { weekKey, ev } = Store.currentModalEventContext;
+
+                const nameInput = document.getElementById('extraNameInput');
+                const commentInput = document.getElementById('extraCommentInput');
+
+                const name = nameInput.value.trim();
+                const comment = commentInput.value.trim();
+
+                if (!name) return Dialog.alert("Please enter a name for the extra person.");
+
+                const overrideRec = CoreLogic.getOverrideRecord(weekKey, ev.id);
+                if (!overrideRec.extras) overrideRec.extras = [];
+
+                overrideRec.extras.push({ id: Date.now(), name, comment });
+
+                nameInput.value = '';
+                commentInput.value = '';
+
+                Store.autoSave();
+                UI.renderRoster();
+                UI.openEventModal(weekKey, ev);
+                UI.setStatusMessage(`Added extra '${name}' to roster.`);
+            },
+
+            removeExtraFromRoster(extraId) {
+                if (!Store.currentModalEventContext) return;
+                const { weekKey, ev } = Store.currentModalEventContext;
+
+                const overrideRec = CoreLogic.getOverrideRecord(weekKey, ev.id);
+                if (overrideRec.extras) {
+                    overrideRec.extras = overrideRec.extras.filter(x => x.id !== extraId);
+                }
+
+                Store.autoSave();
+                UI.renderRoster();
+                UI.openEventModal(weekKey, ev);
+                UI.setStatusMessage("Extra removed.");
+            },
+
+            openDirectPersonEditor(personId) {
+                const person = Store.cache.peopleMap.get(personId);
+                if (!person) return;
+
+                document.getElementById('directPersonId').value = person.id;
+                document.getElementById('directPersonNameTitle').innerText = `Away Dates: ${person.name}`;
+                document.getElementById('directHolidayStart').value = person.holidays?.[0]?.start || '';
+                document.getElementById('directHolidayEnd').value = person.holidays?.[0]?.end || '';
+                document.getElementById('directHolidayDetails').value = person.holidayDetails || '';
+
+                const select = document.getElementById('directAwayDateSelect');
+                select.innerHTML = '<option value="">-- No Away Date Selected --</option>';
+                const dates = CoreLogic.getUpcomingRosteredDatesForPerson(person);
+                dates.forEach(dStr => {
+                    const option = document.createElement('option');
+                    option.value = dStr;
+                    option.innerText = Utils.formatReadableDate(dStr) + ` (${dStr})`;
+                    if (person.awayDate === dStr) option.selected = true;
+                    select.appendChild(option);
+                });
+
+                const editor = document.getElementById('directPersonEditor');
+                editor.classList.add('active');
+                editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            },
+
+            closeDirectPersonEditor() {
+                const editor = document.getElementById('directPersonEditor');
+                editor.classList.remove('active');
+            },
+
+            saveDirectPersonHolidayAway() {
+                const id = parseInt(document.getElementById('directPersonId').value);
+                const person = Store.cache.peopleMap.get(id);
+                if (!person) return;
+
+                const hStart = document.getElementById('directHolidayStart').value;
+                const hEnd = document.getElementById('directHolidayEnd').value;
+                person.holidayDetails = document.getElementById('directHolidayDetails').value.trim();
+                person.awayDate = document.getElementById('directAwayDateSelect').value;
+
+                person.holidays = (hStart && hEnd) ? [{ start: hStart, end: hEnd }] : [];
+
+                CoreLogic.recalculateRosters();
+                Store.autoSave();
+                UI.renderRoster();
+
+                this.closeDirectPersonEditor();
+
+                if (Store.currentModalEventContext) {
+                    const { weekKey, ev } = Store.currentModalEventContext;
+                    const updatedEv = CoreLogic.generateWeeklyEvents(Utils.parseLocalDate(weekKey)).find(e => e.id === ev.id) || ev;
+                    UI.openEventModal(weekKey, updatedEv);
+                }
+                UI.setStatusMessage(`Updated away dates for ${person.name}`);
+            },
+
+            clearDirectPersonHolidayAway() {
+                const id = parseInt(document.getElementById('directPersonId').value);
+                const person = Store.cache.peopleMap.get(id);
+                if (!person) return;
+
+                person.holidays = [];
+                person.holidayDetails = '';
+                person.awayDate = '';
+
+                CoreLogic.recalculateRosters();
+                Store.autoSave();
+                UI.renderRoster();
+
+                this.closeDirectPersonEditor();
+
+                if (Store.currentModalEventContext) {
+                    const { weekKey, ev } = Store.currentModalEventContext;
+                    const updatedEv = CoreLogic.generateWeeklyEvents(Utils.parseLocalDate(weekKey)).find(e => e.id === ev.id) || ev;
+                    UI.openEventModal(weekKey, updatedEv);
+                }
+                UI.setStatusMessage(`Cleared away dates for ${person.name}`);
+            }
+        };
+
+        const TeamsManager = {
+            populate() {
+                this.resetForm();
+                const container = document.getElementById('teamPeopleCheckboxes');
+                const sortedPeople = [...Store.data.people].sort((a, b) => a.name.localeCompare(b.name));
+                container.innerHTML = sortedPeople.map(p => `<label><input type="checkbox" value="${p.id}" class="team-person-cb"> ${p.name}</label>`).join('') || '<em>No staff found.</em>';
+
+                const sortedTeams = [...Store.data.teams].sort((a, b) => a.name.localeCompare(b.name));
+                const list = document.getElementById('teamsList');
+                list.innerHTML = sortedTeams.map(t => {
+                    const members = Store.data.people.filter(p => p.teamIds?.includes(t.id)).map(p => p.name).sort().join(', ') || 'None';
+                    return `<li>
+                    <div class="item-info">
+                        <strong>${t.name}</strong><br><small style="color:#6b7280;">Members: ${members}</small>
+                    </div>
+                    <div class="actions-cell">
+                        <button class="btn-sm warning" onclick="TeamsManager.edit(${t.id})">Edit</button>
+                        <button class="btn-sm danger" onclick="TeamsManager.delete(${t.id})">Delete</button>
+                    </div></li>`;
+                }).join('');
+                document.getElementById('teamsListHeading').innerText = `Existing Teams (${Store.data.teams.length})`;
+            },
+            save(e) {
+                e.preventDefault();
+                const id = document.getElementById('editTeamId').value;
+                const name = document.getElementById('teamNameInput').value.trim();
+                const selectedPeople = Array.from(document.querySelectorAll('.team-person-cb:checked')).map(cb => parseInt(cb.value));
+
+                let targetId = id ? parseInt(id) : Date.now();
+                if (id) {
+                    const team = Store.cache.teamsMap.get(targetId);
+                    if (team) team.name = name;
+                } else {
+                    Store.data.teams.push({ id: targetId, name });
+                }
+
+                Store.data.people.forEach(p => {
+                    const has = p.teamIds.includes(targetId), selected = selectedPeople.includes(p.id);
+                    if (selected && !has) { p.teamIds.push(targetId); CoreLogic.syncTeamMembersToRosters(targetId, p.id); }
+                    else if (!selected && has) p.teamIds = p.teamIds.filter(t => t !== targetId);
+                });
+
+                Store.rebuildCaches(); Store.autoSave(); UI.renderRoster(); this.populate();
+                UI.setStatusMessage("Team saved successfully.");
+            },
+            edit(id) {
+                const team = Store.cache.teamsMap.get(id); if (!team) return;
+                document.getElementById('editTeamId').value = team.id;
+                document.getElementById('teamNameInput').value = team.name;
+                document.querySelectorAll('.team-person-cb').forEach(cb => {
+                    cb.checked = Store.cache.peopleMap.get(parseInt(cb.value))?.teamIds.includes(team.id);
+                });
+                document.getElementById('teamFormTitle').innerText = 'Edit Team';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+            delete(id) {
+                Dialog.confirm("Delete this team?", () => {
+                    Store.data.teams = Store.data.teams.filter(t => t.id !== id);
+                    Store.data.people.forEach(p => p.teamIds = p.teamIds.filter(t => t !== id));
+                    Store.data.events.forEach(ev => { if (ev.teamId === id) ev.teamId = ""; });
+                    Store.rebuildCaches(); CoreLogic.recalculateRosters(); this.populate();
+                });
+            },
+            resetForm() {
+                document.getElementById('editTeamId').value = '';
+                document.getElementById('teamNameInput').value = '';
+                document.querySelectorAll('.team-person-cb').forEach(cb => cb.checked = false);
+                document.getElementById('teamFormTitle').innerText = 'Add New Team';
+            }
+        };
+
+        const PeopleManager = {
+            populate() {
+                this.resetForm();
+                const sortedTeams = [...Store.data.teams].sort((a, b) => a.name.localeCompare(b.name));
+                document.getElementById('personTeamCheckboxes').innerHTML = sortedTeams.map(t => `<label><input type="checkbox" value="${t.id}" class="person-team-cb"> ${t.name}</label>`).join('') || '<em>No teams.</em>';
+
+                const sortedPeople = [...Store.data.people].sort((a, b) => a.name.localeCompare(b.name));
+                document.getElementById('peopleList').innerHTML = sortedPeople.map(p => {
+                    const emailInfo = p.email ? `<br><small style="color:#4b5563;">✉️ ${p.email}</small>` : '';
+                    const activeRangeInfo = (p.activeFrom || p.activeUntil) ? `<br><small style="color:#6b7280;">Active: ${p.activeFrom ? Utils.formatReadableDate(p.activeFrom) : 'Beginning'} - ${p.activeUntil ? Utils.formatReadableDate(p.activeUntil) : 'Indefinite'}</small>` : '';
+                    const awayInfo = p.awayDate ? `<br><small style="color:#ef4444;">Away: ${Utils.formatReadableDate(p.awayDate)}</small>` : '';
+                    const holInfo = p.holidayDetails ? `<br><small style="color:#d97706;">Away Note: ${p.holidayDetails}</small>` : '';
+                    return `
+                    <li>
+                    <div class="item-info">
+                        <strong>${p.name}</strong>${emailInfo}${activeRangeInfo}<br><small style="color:#6b7280;">Teams: ${p.teamIds.map(tId => Store.cache.teamsMap.get(tId)?.name).filter(Boolean).sort().join(', ') || 'None'}</small>${awayInfo}${holInfo}
+                    </div>
+                    <div class="actions-cell">
+                        <button class="btn-sm warning" onclick="PeopleManager.edit(${p.id})">Edit</button>
+                        <button class="btn-sm danger" onclick="PeopleManager.promptDelete(${p.id})">Delete</button>
+                    </div></li>`;
+                }).join('');
+                document.getElementById('peopleListHeading').innerText = `Current Staff (${Store.data.people.length})`;
+            },
+
+            updateAwayDateDropdown(person) {
+                const select = document.getElementById('personAwayDateSelect');
+                select.innerHTML = '<option value="">-- No Away Date Selected --</option>';
+                if (!person) return;
+
+                const dates = CoreLogic.getUpcomingRosteredDatesForPerson(person);
+                dates.forEach(dStr => {
+                    const option = document.createElement('option');
+                    option.value = dStr;
+                    option.innerText = Utils.formatReadableDate(dStr) + ` (${dStr})`;
+                    if (person.awayDate === dStr) option.selected = true;
+                    select.appendChild(option);
+                });
+            },
+
+            save(e) {
+                e.preventDefault();
+                const id = document.getElementById('editPersonId').value;
+                const name = document.getElementById('personNameInput').value.trim();
+                const email = document.getElementById('personEmailInput').value.trim();
+                const activeFrom = document.getElementById('personActiveFrom').value;
+                const activeUntil = document.getElementById('personActiveUntil').value;
+                const hStart = document.getElementById('personHolidayStart').value;
+                const hEnd = document.getElementById('personHolidayEnd').value;
+                const holidayDetails = document.getElementById('personHolidayDetails').value.trim();
+                const awayDate = document.getElementById('personAwayDateSelect').value;
+                const teamIds = Array.from(document.querySelectorAll('.person-team-cb:checked')).map(cb => parseInt(cb.value));
+                const holidays = (hStart && hEnd) ? [{ start: hStart, end: hEnd }] : [];
+
+                let targetId = id ? parseInt(id) : Date.now();
+                let savedPerson;
+                if (id) {
+                    savedPerson = Store.cache.peopleMap.get(targetId);
+                    if (savedPerson) Object.assign(savedPerson, { name, email, teamIds, activeFrom, activeUntil, holidays, holidayDetails, awayDate });
+                } else {
+                    savedPerson = { id: targetId, name, email, teamIds, activeFrom, activeUntil, holidays, holidayDetails, awayDate };
+                    Store.data.people.push(savedPerson);
+                }
+
+                Store.rebuildCaches();
+                CoreLogic.recalculateRosters();
+
+                teamIds.forEach(tId => CoreLogic.syncTeamMembersToRosters(tId, targetId));
+                Store.autoSave(); UI.renderRoster(); this.populate();
+                UI.setStatusMessage("Person details saved.");
+            },
+
+            edit(id) {
+                const p = Store.cache.peopleMap.get(id); if (!p) return;
+                document.getElementById('editPersonId').value = p.id;
+                document.getElementById('personNameInput').value = p.name;
+                document.getElementById('personEmailInput').value = p.email || '';
+                document.getElementById('personActiveFrom').value = p.activeFrom || '';
+                document.getElementById('personActiveUntil').value = p.activeUntil || '';
+                document.getElementById('personHolidayStart').value = p.holidays?.[0]?.start || '';
+                document.getElementById('personHolidayEnd').value = p.holidays?.[0]?.end || '';
+                document.getElementById('personHolidayDetails').value = p.holidayDetails || '';
+
+                document.querySelectorAll('.person-team-cb').forEach(cb => cb.checked = p.teamIds.includes(parseInt(cb.value)));
+                this.updateAwayDateDropdown(p);
+                document.getElementById('personFormTitle').innerText = 'Edit Person';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+
+            promptDelete(id) {
+                const p = Store.cache.peopleMap.get(id); if (!p) return;
+                let rosterCount = 0;
+                Object.values(Store.data.rosters).forEach(w => Object.values(w).forEach(arr => { if (arr.includes(id)) rosterCount++; }));
+
+                Dialog.confirm(`Permanently delete ${p.name}? Unassigns from ${rosterCount} scheduled events.`, () => {
+                    Store.data.people = Store.data.people.filter(item => item.id !== id);
+                    Object.keys(Store.data.rosters).forEach(w => Object.keys(Store.data.rosters[w]).forEach(eKey => {
+                        Store.data.rosters[w][eKey] = Store.data.rosters[w][eKey].filter(pId => pId !== id);
+                    }));
+                    Store.rebuildCaches(); CoreLogic.recalculateRosters(); this.populate();
+                });
+            },
+
+            resetForm() {
+                document.getElementById('editPersonId').value = '';
+                document.getElementById('personNameInput').value = '';
+                document.getElementById('personEmailInput').value = '';
+                document.getElementById('personActiveFrom').value = '';
+                document.getElementById('personActiveUntil').value = '';
+                document.getElementById('personHolidayStart').value = '';
+                document.getElementById('personHolidayEnd').value = '';
+                document.getElementById('personHolidayDetails').value = '';
+                document.querySelectorAll('.person-team-cb').forEach(cb => cb.checked = false);
+                this.updateAwayDateDropdown(null);
+                document.getElementById('personFormTitle').innerText = 'Add New Person';
+            }
+        };
+
+        const EventsManager = {
+            populate() {
+                this.resetForm();
+                const sortedTeams = [...Store.data.teams].sort((a, b) => a.name.localeCompare(b.name));
+                document.getElementById('eventTeamSelect').innerHTML = '<option value="">-- Any Available Staff --</option>' +
+                    sortedTeams.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
+                const sortedEvents = [...Store.data.events].sort((a, b) => a.title.localeCompare(b.title));
+                document.getElementById('eventsList').innerHTML = sortedEvents.map(ev => `
+                    <li>
+                    <div class="item-info">
+                        <strong>${ev.title}</strong> ${ev.type === 'SPECIAL' ? '<span class="badge badge-special">SPECIAL</span>' : ''}<br>
+                        <small style="color:#6b7280;">📍 ${ev.location} | Cap: ${ev.minPeople}-${ev.maxPeople} | Team: ${Store.cache.teamsMap.get(ev.teamId)?.name || 'Unassigned'}</small>
+                    </div>
+                    <div class="actions-cell">
+                        <button class="btn-sm warning" onclick="EventsManager.edit(${ev.id})">Edit</button>
+                        <button class="btn-sm danger" onclick="EventsManager.delete(${ev.id})">Delete</button>
+                    </div></li>`).join('');
+                document.getElementById('eventsListHeading').innerText = `Current Events (${Store.data.events.length})`;
+            },
+            toggleTypeFields() {
+                const isSpecial = document.getElementById('eventTypeSelect').value === 'SPECIAL';
+                document.getElementById('specialEventGroup').style.display = isSpecial ? 'block' : 'none';
+                document.getElementById('regularEventGroup').style.display = isSpecial ? 'none' : 'block';
+            },
+            toggleRecurrenceFields() {
+                const isNth = document.getElementById('eventRecurrenceType').value === 'MONTHLY_NTH';
+                document.getElementById('weeklyOptions').style.display = isNth ? 'none' : 'flex';
+                document.getElementById('monthlyOptions').style.display = isNth ? 'flex' : 'none';
+            },
+            save(e) {
+                e.preventDefault();
+                const id = document.getElementById('editEventId').value;
+                const type = document.getElementById('eventTypeSelect').value;
+                const title = document.getElementById('eventTitleInput').value.trim();
+                const location = document.getElementById('eventLocationInput').value.trim();
+                const teamId = parseInt(document.getElementById('eventTeamSelect').value) || "";
+                const minPeople = parseInt(document.getElementById('eventMinInput').value);
+                const maxPeople = parseInt(document.getElementById('eventMaxInput').value);
+                const time = document.getElementById('eventTimeInput').value;
+
+                if (minPeople > maxPeople) return Dialog.alert("Min staff cannot exceed Max staff.");
+
+                const payload = { type, title, location, teamId, minPeople, maxPeople, time };
+                if (type === 'SPECIAL') {
+                    payload.specialDate = document.getElementById('eventSpecialDate').value;
+                } else {
+                    payload.recurrenceType = document.getElementById('eventRecurrenceType').value;
+                    payload.startDate = document.getElementById('eventStartDate').value;
+                    payload.endDate = document.getElementById('eventEndDate').value;
+                    if (payload.recurrenceType === 'MONTHLY_NTH') {
+                        payload.nthOrder = parseInt(document.getElementById('eventNthOrder').value);
+                        payload.nthDayOfWeek = parseInt(document.getElementById('eventNthDaySelect').value);
+                    } else {
+                        payload.interval = parseInt(document.getElementById('eventWeekInterval').value) || 1;
+                        payload.dayOfWeek = parseInt(document.getElementById('eventDaySelect').value);
+                    }
+                }
+
+                if (id) {
+                    const ev = Store.cache.eventsMap.get(parseInt(id));
+                    if (ev) Object.assign(ev, payload);
+                } else {
+                    Store.data.events.push({ id: Date.now(), ...payload });
+                }
+
+                if (teamId) CoreLogic.syncTeamMembersToRosters(teamId);
+                Store.rebuildCaches(); CoreLogic.recalculateRosters(); this.populate();
+                UI.setStatusMessage("Event saved successfully.");
+            },
+            edit(id) {
+                const ev = Store.cache.eventsMap.get(id); if (!ev) return;
+                document.getElementById('editEventId').value = ev.id;
+                document.getElementById('eventTypeSelect').value = ev.type || 'REGULAR';
+                this.toggleTypeFields();
+                document.getElementById('eventTitleInput').value = ev.title;
+                document.getElementById('eventLocationInput').value = ev.location;
+                document.getElementById('eventTeamSelect').value = ev.teamId || '';
+                document.getElementById('eventMinInput').value = ev.minPeople;
+                document.getElementById('eventMaxInput').value = ev.maxPeople;
+                document.getElementById('eventTimeInput').value = ev.time;
+
+                if (ev.type === 'SPECIAL') {
+                    document.getElementById('eventSpecialDate').value = ev.specialDate || '';
+                } else {
+                    document.getElementById('eventRecurrenceType').value = ev.recurrenceType || 'WEEKLY';
+                    this.toggleRecurrenceFields();
+                    document.getElementById('eventStartDate').value = ev.startDate || '';
+                    document.getElementById('eventEndDate').value = ev.endDate || '';
+                    if (ev.recurrenceType === 'MONTHLY_NTH') {
+                        document.getElementById('eventNthOrder').value = ev.nthOrder || 1;
+                        document.getElementById('eventNthDaySelect').value = ev.nthDayOfWeek || 1;
+                    } else {
+                        document.getElementById('eventWeekInterval').value = ev.interval || 1;
+                        document.getElementById('eventDaySelect').value = ev.dayOfWeek || 1;
+                    }
+                }
+                document.getElementById('eventFormTitle').innerText = 'Edit Event';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+            delete(id) {
+                Dialog.confirm("Remove this event completely?", () => {
+                    Store.data.events = Store.data.events.filter(e => e.id !== id);
+                    Store.rebuildCaches(); CoreLogic.recalculateRosters(); this.populate();
+                });
+            },
+            resetForm() {
+                document.getElementById('editEventId').value = '';
+                document.getElementById('eventTypeSelect').value = 'REGULAR';
+                this.toggleTypeFields();
+                document.getElementById('eventTitleInput').value = '';
+                document.getElementById('eventLocationInput').value = '';
+                document.getElementById('eventTeamSelect').value = '';
+                document.getElementById('eventMinInput').value = '1';
+                document.getElementById('eventMaxInput').value = '2';
+                document.getElementById('eventTimeInput').value = '';
+                document.getElementById('eventFormTitle').innerText = 'Add New Event';
+            }
+        };
+
+        const ClosuresManager = {
+            populate() {
+                this.resetForm();
+                const sortedEvents = [...Store.data.events].sort((a, b) => a.title.localeCompare(b.title));
+                document.getElementById('closureTargetSelect').innerHTML = '<option value="ALL">All Events (Entire Hub Closed)</option>' +
+                    sortedEvents.map(ev => `<option value="${ev.id}">Only Event: ${ev.title}</option>`).join('');
+
+                const sortedClosures = [...Store.data.closures].sort((a, b) => a.name.localeCompare(b.name));
+                document.getElementById('closuresList').innerHTML = sortedClosures.map(c => `
+                    <li>
+                    <div class="item-info">
+                        <strong>${c.name}</strong> ${c.type === 'INFO' ? '<span class="badge badge-info">INFO</span>' : '<span class="badge badge-closed">CLOSURE</span>'}<br>
+                        <small style="color:#6b7280;">📅 ${Utils.formatReadableDate(c.startDate)} to ${Utils.formatReadableDate(c.endDate || c.startDate)} ${c.type !== 'INFO' ? '| Scope: ' + (c.target === 'ALL' ? 'All' : (Store.cache.eventsMap.get(c.target)?.title || 'Single')) : ''}</small>
+                    </div>
+                    <div class="actions-cell">
+                        <button class="btn-sm warning" onclick="ClosuresManager.edit(${c.id})">Edit</button>
+                        <button class="btn-sm danger" onclick="ClosuresManager.delete(${c.id})">Delete</button>
+                    </div></li>`).join('');
+                document.getElementById('closuresListHeading').innerText = `Configured Entries (${Store.data.closures.length})`;
+            },
+            toggleTypeFields() {
+                const isInfo = document.getElementById('closureTypeSelect').value === 'INFO';
+                document.getElementById('closureTargetGroup').style.display = isInfo ? 'none' : 'block';
+            },
+            save(e) {
+                e.preventDefault();
+                const id = document.getElementById('editClosureId').value;
+                const type = document.getElementById('closureTypeSelect').value;
+                const name = document.getElementById('closureNameInput').value.trim();
+                const startDate = document.getElementById('closureStartDate').value;
+                let endDate = document.getElementById('closureEndDate').value || startDate;
+                const target = document.getElementById('closureTargetSelect').value;
+
+                if (startDate > endDate) return Dialog.alert("Start date cannot be after End date.");
+
+                const payload = { type, name, startDate, endDate, target: type === 'INFO' ? 'NONE' : (target === "ALL" ? "ALL" : parseInt(target)) };
+                if (id) {
+                    const c = Store.cache.closuresMap.get(parseInt(id));
+                    if (c) Object.assign(c, payload);
+                } else {
+                    Store.data.closures.push({ id: Date.now(), ...payload });
+                }
+
+                Store.rebuildCaches();
+                CoreLogic.recalculateRosters();
+                this.populate();
+                UI.setStatusMessage("Calendar entry saved.");
+            },
+            edit(id) {
+                const c = Store.cache.closuresMap.get(id); if (!c) return;
+                document.getElementById('editClosureId').value = c.id;
+                document.getElementById('closureTypeSelect').value = c.type || 'CLOSURE';
+                this.toggleTypeFields();
+                document.getElementById('closureNameInput').value = c.name;
+                document.getElementById('closureStartDate').value = c.startDate;
+                document.getElementById('closureEndDate').value = c.endDate || c.startDate;
+                document.getElementById('closureTargetSelect').value = c.target || "ALL";
+                document.getElementById('closureFormTitle').innerText = 'Edit Calendar Entry';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+            delete(id) {
+                Dialog.confirm("Remove this calendar entry?", () => {
+                    Store.data.closures = Store.data.closures.filter(c => c.id !== id);
+                    Store.rebuildCaches();
+                    CoreLogic.recalculateRosters();
+                    this.populate();
+                });
+            },
+            resetForm() {
+                document.getElementById('editClosureId').value = '';
+                document.getElementById('closureTypeSelect').value = 'CLOSURE';
+                this.toggleTypeFields();
+                document.getElementById('closureNameInput').value = '';
+                document.getElementById('closureStartDate').value = '';
+                document.getElementById('closureEndDate').value = '';
+                document.getElementById('closureTargetSelect').value = 'ALL';
+                document.getElementById('closureFormTitle').innerText = 'Add Calendar Entry';
+            }
+        };
+
+        const ExportManager = {
+            openShareModal() {
+                if (Store.selectedWeeks.size === 0) return Dialog.alert("Please check at least one week box first to share.");
+                const selected = Utils.getNext10Weeks().filter(w => Store.selectedWeeks.has(Utils.formatDate(w))).sort((a,b) => a-b);
+                let out = "";
+
+                selected.forEach((w, idx) => {
+                    const weekStartStr = Utils.formatDate(w);
+                    out += `Roster for week beginning ${Utils.formatReadableDate(weekStartStr)}\n`;
+
+                    const infoEvents = CoreLogic.getWeeklyInfoEvents(w);
+                    if (infoEvents.length > 0) {
+                        infoEvents.forEach(ie => {
+                            const dateRange = (ie.endDate && ie.endDate !== ie.startDate)
+                                ? `${Utils.formatReadableDate(ie.startDate)} - ${Utils.formatReadableDate(ie.endDate)}`
+                                : Utils.formatReadableDate(ie.startDate);
+                            out += `Calendar Event: ${ie.name} (${dateRange})\n`;
+                        });
+                    }
+
+                    CoreLogic.generateWeeklyEvents(w).forEach(ev => {
+                        if (ev.closure) {
+                            out += `${ev.title}: CLOSED (${ev.closure.name})\n`;
+                        } else {
+                            const names = ev.assigned.map(id => Store.cache.peopleMap.get(id)?.name).filter(Boolean).sort().join(', ') || 'None';
+                            out += `${ev.title} (${ev.actualDate.toLocaleDateString('en-NZ', { weekday: 'short' })} ${Utils.getShortDate(ev.actualDate)}): ${names}\n`;
+
+                            if (ev.extras && ev.extras.length > 0) {
+                                const extrasStr = ev.extras.map(x => `${x.name}${x.comment ? ' (' + x.comment + ')' : ''}`).join(', ');
+                                out += `  + Extras: ${extrasStr}\n`;
+                            }
+
+                            if (ev.teamId) {
+                                const awayTeamMembers = Store.data.people
+                                    .filter(p => p.teamIds?.includes(ev.teamId) && CoreLogic.getPersonAwayReason(p, ev.dateStr) !== null)
+                                    .map(p => p.name)
+                                    .sort();
+
+                                if (awayTeamMembers.length > 0) {
+                                    out += `  (away - ${awayTeamMembers.join(', ')})\n`;
+                                }
+                            }
+                        }
+                    });
+
+                    if (idx < selected.length - 1) out += "\n----------------------------------------\n\n";
+                });
+
+                document.getElementById('shareTextOutput').value = out;
+                UI.openModal('shareModal');
+            },
+            copyShareText() {
+                const text = document.getElementById('shareTextOutput');
+                text.select();
+                navigator.clipboard.writeText(text.value).then(() => Dialog.alert("Copied to clipboard!")).catch(() => Dialog.alert("Copy failed. Try selecting manually."));
+            },
+            exportCSV() {
+                if (Store.selectedWeeks.size === 0) return Dialog.alert("Please check at least one week box first to export.");
+                let csv = "data:text/csv;charset=utf-8,Week Start,Weekday,Date,Time,Location,Event,Rostered,Extras\n";
+                Utils.getNext10Weeks().filter(w => Store.selectedWeeks.has(Utils.formatDate(w))).forEach(w => {
+                    const wKey = Utils.formatDate(w);
+                    CoreLogic.generateWeeklyEvents(w).forEach(ev => {
+                        const names = ev.closure ? `CLOSED (${ev.closure.name})` : (ev.assigned.map(id => Store.cache.peopleMap.get(id)?.name).filter(Boolean).sort().join(' & ') || 'Unassigned');
+                        const extrasStr = (ev.extras && ev.extras.length > 0) ? ev.extras.map(x => `${x.name}${x.comment ? ' (' + x.comment + ')' : ''}`).join(' & ') : 'None';
+                        const wDay = ev.actualDate.toLocaleDateString('en-NZ', { weekday: 'long' });
+                        csv += `"${wKey}","${wDay}","${ev.dateStr}","${ev.time}","${ev.location}","${ev.title}","${names}","${extrasStr}"\n`;
+                    });
+                });
+                const encodedUri = encodeURI(csv);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `Roster_Export_${Utils.formatDate(new Date())}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        };
+
+        window.UI = UI;
+        window.Store = Store;
+        window.CoreLogic = CoreLogic;
+        window.Utils = Utils;
+        window.TeamsManager = TeamsManager;
+        window.PeopleManager = PeopleManager;
+        window.EventsManager = EventsManager;
+        window.ClosuresManager = ClosuresManager;
+        window.ExportManager = ExportManager;
+        window.Utilities = Utilities;
+        window.Simulation = Simulation;
+        window.Dialog = Dialog;
+        window.AuthManager = AuthManager;
+
+        window.addEventListener('resize', () => {
+            if (Store.activeViewId === 'rosterView') {
+                UI.renderRoster();
+            }
+        });
+
+        onAuthStateChanged(auth, (user) => {
+            AuthManager.currentUser = user;
+            const btn = document.getElementById('authBtn');
+            if (user) {
+                btn.innerText = "Sign Out";
+                btn.className = "btn-sm secondary";
+            } else {
+                btn.innerText = "Sign In";
+                btn.className = "btn-sm primary";
+            }
+            CloudSync.init();
+        });
+    </script>
+</body>
+</html>
